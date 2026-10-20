@@ -44,15 +44,22 @@ export function initTable() {
 export function showTable() {
   const [W, H] = sizeOf({ size: S.size });
   if (!T.cells || T.W !== W || T.H !== H) {
-    T.W = W; T.H = H; T.cells = new Array(W * H).fill(0); T.stack = [];
+    T.W = W; T.H = H; T.cells = new Array(W * H).fill(0); T.stack = []; T.starter = 1;
+    // one saved board per size (older versions kept a single board under "c4:table")
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem("c4:table")); } catch (e) {}
-    if (saved && saved.W === W && saved.H === H && Array.isArray(saved.cells)) { T.cells = saved.cells; T.stack = saved.stack || []; T.starter = saved.starter || 1; }
+    try { saved = JSON.parse(localStorage.getItem(tableKey()) || localStorage.getItem("c4:table")); } catch (e) {}
+    const okCells = saved && saved.W === W && saved.H === H && Array.isArray(saved.cells) && saved.cells.length === W * H && saved.cells.every((v) => v === 0 || v === 1 || v === 2);
+    if (okCells) {
+      T.cells = saved.cells;
+      T.stack = Array.isArray(saved.stack) ? saved.stack.filter((i) => Number.isInteger(i) && T.cells[i]) : [];
+      T.starter = saved.starter === 2 ? 2 : 1;
+    }
     board.build(W, H);
   }
   draw(false);
 }
 
+function tableKey() { return `c4:table:${T.W}x${T.H}`; }
 function counts() { let r = 0, y = 0; for (const v of T.cells) { if (v === 1) r++; else if (v === 2) y++; } return [r, y]; }
 function toMove() {
   const [r, y] = counts();
@@ -74,7 +81,7 @@ function tap(c) {
 }
 
 function draw(animate = true) {
-  try { localStorage.setItem("c4:table", JSON.stringify({ W: T.W, H: T.H, cells: T.cells, stack: T.stack, starter: T.starter })); } catch (e) {}
+  try { localStorage.setItem(tableKey(), JSON.stringify({ W: T.W, H: T.H, cells: T.cells, stack: T.stack, starter: T.starter })); } catch (e) {}
   $$("#tBrush button").forEach((b) => b.classList.toggle("on", b.dataset.k === T.brush));
   $("#tStarter").innerHTML = `${discIcon(T.starter, 16)} ${T.starter === 1 ? "Red" : "Yellow"} started`;
   board.set(T.cells, { animate: animate && S.anim });

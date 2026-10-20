@@ -65,6 +65,10 @@ await shot(B, "online-mid-bob");
 // Bob reloads mid-game and must be put back in his seat
 reloading = true;
 await B.reload();
+await B.waitForSelector("#pboard svg", { timeout: 30000 });
+// before the room is back, the local board must not offer a turn
+const early = await B.evaluate(() => document.querySelector("#pstatus").textContent);
+console.log(/Your turn/.test(early) && !/Bob|Alice/.test(early) ? `FAIL right after reload the page says "${early.trim()}"` : `PASS right after reload: "${early.trim() || "(online view)"}"`);
 await B.waitForSelector("#pstage:not([hidden]) #pboard svg", { timeout: 30000 });
 await B.waitForFunction(() => document.querySelectorAll("#pboard .disc").length === 4, null, { timeout: 30000 });
 reloading = false;

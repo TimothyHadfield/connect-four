@@ -46,7 +46,10 @@ const P = {
   human: 0, comp: 1,    // seats in computer mode
   level: S.level,
   gen: 0,               // bumps on every new game: late computer moves / analysis are dropped
-  botBusy: false,
+  botGen: -1,           // the game number the computer is thinking for (a new game frees it)
+  gameId: 0,            // one id per game, kept through Undo: the record counts each game once
+  counted: 0,           // gameId whose result is already in the record
+  resuming: false,      // true while a saved online room reconnects after a reload
   popMode: false,
   cols: null, pop: null, hint: false,
   animUntil: 0,
@@ -86,11 +89,14 @@ function curOptions() {
 export function newLocalGame(mode = P.mode, opts = {}) {
   P.gen++;
   if (P.room && P.room.close && P.mode !== "online") P.room.close();
+  const resume = opts.resume || null;
   P.mode = mode;
   P.level = opts.level || S.level;
   P.popMode = false; P.hint = false; P.cols = null; P.pop = null; P.saved = false;
+  P.gameId = resume ? resume.id : Date.now();
   let first = 0;
-  if (mode === "computer") {
+  if (resume) first = resume.options.first;
+  else if (mode === "computer") {
     const st = opts.starts || S.starts;
     const youFirst = st === "you" ? true : st === "computer" ? false : S.nextStart === 0;
     if (st === "alternate") { S.nextStart = 1 - S.nextStart; save(); }
@@ -98,16 +104,33 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   } else if (mode === "friends") {
     first = S.nextStart === 1 ? 1 : 0;
   }
-  P.options = { ...curOptions(), first };
-  const names = mode === "computer" ? [S.name || "You", "Computer"] : ["Red", "Yellow"];
+  P.options = resume ? { ...resume.options, level: P.level } : { ...curOptions(), first };
+  let names = mode === "computer" ? [S.name || "You", "Computer"] : ["Red", "Yellow"];
   if (mode === "computer" && P.human === 1) names.reverse();
+  if (resume && resume.names && resume.names.every((n) => n)) names = resume.names;
   P.room = createLocal({ game, seats: ["human", "human"], options: P.options, names });
   P.room.on("change", (s) => { if (!P.silent) render(s); });
   P.room.on("error", (e) => toast(e.message || String(e)));
   const [W, H] = sizeOf(P.options);
   board.build(W, H);
   bot.warm(W, H);
+  if (!resume) { P.room.start(); return; }
+  P.silent = true;
   P.room.start();
+  for (const m of resume.moves) P.room.act(m.d ? { draw: true } : m.p ? { c: m.c, p: true } : { c: m.c }, m.s);
+  P.silent = false;
+  render(P.room.view(P.room.state.turn), { animate: false });
+}
+
+/** Keeps the unfinished local game in storage so a reload brings it back. */
+function saveCurrent(pub) {
+  if (P.mode === "online") return;
+  const cur = pub && !pub.result && pub.moves.length
+    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves }
+    : null;
+  if (JSON.stringify(cur) === JSON.stringify(S.current)) return;
+  S.current = cur;
+  save();
 }
 
 function replayTo(moves) {
@@ -138,6 +161,7 @@ function isMyTurn() {
   const s = P.snap;
   if (!s || !s.pub || s.pub.result) return false;
   if (s.status && s.status !== "playing") return false;
+  if (P.resuming) return false;
   if (P.mode === "online") return s.myTurn;
   if (P.mode === "computer") return s.pub.turn === P.human;
   return true;
@@ -147,8 +171,16 @@ function onColumn(c) {
   const s = P.snap;
   if (!s || !s.pub) return;
   if (s.pub.result) { toast("Game over. Tap New game."); return; }
+  if (P.resuming) { toast("Reconnecting to your room…"); return; }
   if (!isMyTurn()) { toast(P.mode === "computer" ? "Wait for the computer." : "Not your turn."); return; }
-  if (performance.now() < P.animUntil - 120) return; // let the last disc land
+  const wait = P.animUntil - 120 - performance.now();
+  if (wait > 0) {
+    // the last disc is still falling: play this tap as soon as it lands
+    const gen = P.gen, moves = s.pub.moves.length;
+    clearTimeout(P.queued);
+    P.queued = setTimeout(() => { if (gen === P.gen && P.snap && P.snap.pub.moves.length === moves) onColumn(c); }, wait + 10);
+    return;
+  }
   const seat = s.pub.turn;
   const { W, H, cells } = s.pub;
   let a;
@@ -189,6 +221,7 @@ function render(snap, { animate = true } = {}) {
   board.setChips(null);
   P.cols = null; P.pop = null;
   $("#pverdict").textContent = "";
+  if (P.mode !== "online") saveCurrent(pub);
   if (pub.result) onFinished(snap);
   else {
     maybeBot(snap, ms);
@@ -226,7 +259,8 @@ function renderPlayers(snap) {
 
 function matchScore() {
   if (P.mode !== "computer") return null;
-  const k = P.level + ":" + S.size + (S.popout ? ":pop" : "");
+  const o = P.options || curOptions();
+  const k = P.level + ":" + o.size + (o.popout ? ":pop" : "");
   return S.record[k] || { w: 0, d: 0, l: 0 };
 }
 
@@ -243,7 +277,8 @@ function renderStatus(snap) {
     return;
   }
   const t = pub.turn;
-  if (P.mode === "computer") el.innerHTML = t === P.human ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `<span class="thinking">Computer is thinking</span>`;
+  if (P.resuming) el.innerHTML = `<span class="thinking">Reconnecting to your room</span>`;
+  else if (P.mode === "computer") el.innerHTML = t === P.human ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `<span class="thinking">Computer is thinking</span>`;
   else if (P.mode === "online") el.innerHTML = snap.myTurn ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `${discIcon(disc(t))} <span class="thinking">${esc(snap.seats[t].name)} is playing</span>${snap.hostAway ? " · host offline" : ""}`;
   else el.innerHTML = `${discIcon(disc(t))} ${esc(snap.seats[t].name)}'s turn${P.popMode ? ": pick a disc to pop" : ""}`;
 }
@@ -268,15 +303,17 @@ function renderActions(snap) {
 
 $("#bHint").onclick = () => {
   P.hint = true;
-  if (!P.cols && !P.pop) { refreshAnalysis(true); toast("Thinking…", 900); return; }
+  const known = P.pop || (P.cols && P.cols.every((x) => !x || (x.cat !== null && x.cat !== undefined)));
+  if (!known) { P.hintShown = -1; if (!P.cols && !P.pop) refreshAnalysis(true); toast("Thinking…", 900); return; }
   showHint();
 };
-function showHint() {
+function showHint(quiet = false) {
   const pub = P.snap.pub;
+  const say = (t) => { if (!quiet) toast(t); };
   if (P.pop) {
     const { chips, best } = popChips(P.pop, pub.W);
-    if (best && best.p) { toast(`Best: pop column ${best.c + 1}`); board.popMarks([best.c]); }
-    else if (best) { chips[best.c] = { ...chips[best.c], cls: (chips[best.c].cls || "") + " pick" }; board.setChips(chips); toast(`Best: column ${best.c + 1}`); }
+    if (best && best.p) { say(`Best: pop column ${best.c + 1}`); board.popMarks([best.c]); }
+    else if (best) { chips[best.c] = { ...chips[best.c], cls: (chips[best.c].cls || "") + " pick" }; board.setChips(chips); say(`Best: column ${best.c + 1}`); }
     return;
   }
   const b = bestLine(P.cols, count(pub.cells), pub.W, pub.H);
@@ -284,7 +321,7 @@ function showHint() {
   const chips = chipsFor(P.cols, count(pub.cells), pub.W, pub.H);
   for (const c of b.cols) if (chips[c]) chips[c].cls += " pick";
   board.setChips(chips);
-  toast(`Best: ${colList(b.cols)}${b.d ? (b.d.result === "win" ? `, win in ${b.d.turns}` : b.d.result === "loss" ? `, still lose in ${b.d.turns}` : ", draw") : ""}`);
+  say(`Best: ${colList(b.cols)}${b.d ? (b.d.result === "win" ? `, win in ${b.d.turns}` : b.d.result === "loss" ? `, still lose in ${b.d.turns}` : ", draw") : ""}`);
 }
 $("#bUndo").onclick = () => {
   const pub = P.snap.pub;
@@ -307,20 +344,20 @@ function count(cells) { let n = 0; for (const v of cells) if (v) n++; return n; 
 function maybeBot(snap, animMs) {
   if (P.mode !== "computer") return;
   const pub = snap.pub;
-  if (pub.result || pub.turn !== P.comp || P.botBusy) return;
-  P.botBusy = true;
+  if (pub.result || pub.turn !== P.comp || P.botGen === P.gen) return;
   const gen = P.gen;
+  P.botGen = gen;
   const t0 = performance.now();
   bot.move(pub, P.comp, P.level).then((m) => {
     const wait = Math.max(0, Math.max(animMs + 150, 450) - (performance.now() - t0));
     setTimeout(() => {
-      P.botBusy = false;
+      if (P.botGen === gen) P.botGen = -1;
       if (gen !== P.gen || !P.room) return;
       const s = P.room.state;
       if (s.result || s.turn !== P.comp) return;
       P.room.act(m, P.comp);
     }, wait);
-  }).catch((e) => { P.botBusy = false; toast("Computer error: " + e.message); });
+  }).catch((e) => { if (P.botGen === gen) P.botGen = -1; toast("Computer error: " + e.message); });
 }
 
 /* ----------------------------------------------------------- the solver */
@@ -338,7 +375,9 @@ function refreshAnalysis(force = false) {
     if (m.pop) { P.pop = m.pop; }
     else P.cols = m.cols;
     if (S.showSolver || P.hint) drawChips();
-    if (m.done && P.hint) showHint();
+    // a hint needs only win / draw / lose for every column, not the exact distances
+    const ready = m.done || (!m.pop && m.cols && m.cols.every((x) => !x || (x.cat !== null && x.cat !== undefined)));
+    if (P.hint && ready) { showHint(P.hintShown === moves); P.hintShown = moves; }
   });
 }
 function drawChips() {
@@ -371,16 +410,20 @@ function onFinished(snap) {
   P.saved = true;
   const pub = snap.pub;
   const w = pub.result.winner;
-  if (P.mode === "computer") {
-    const k = P.level + ":" + S.size + (S.popout ? ":pop" : "");
+  const firstTime = P.counted !== P.gameId;
+  P.counted = P.gameId;
+  if (P.mode === "computer" && firstTime) {
+    const k = P.level + ":" + pub.size + (pub.popout ? ":pop" : "");
     const r = S.record[k] || { w: 0, d: 0, l: 0 };
     if (w < 0) r.d++; else if (w === P.human) r.w++; else r.l++;
     S.record[k] = r;
     renderPlayers(snap);
   }
-  if (P.mode === "friends") S.nextStart = 1 - (pub.first || 0);
+  if (P.mode === "friends" && firstTime) S.nextStart = 1 - (pub.first || 0);
+  const id = P.mode === "online" ? Date.now() : P.gameId;
+  S.history = S.history.filter((g) => g.id !== id);
   S.history.unshift({
-    id: Date.now(), date: new Date().toISOString().slice(0, 10), mode: P.mode, level: P.mode === "computer" ? P.level : null,
+    id, date: new Date().toISOString().slice(0, 10), mode: P.mode, level: P.mode === "computer" ? P.level : null,
     opts: { size: pub.size, popout: pub.popout, first: pub.first }, names: snap.seats.map((s) => s.name),
     you: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
     moves: pub.moves, winner: w, why: pub.result.why,
@@ -494,7 +537,7 @@ function renderOnline(snap) {
     <h2>Play online ${q("online")}</h2>
     <input type="text" id="oName" maxlength="20" placeholder="Your name" autocomplete="nickname" value="${esc(S.name)}">
     <button class="btn primary" id="oCreate">Create room</button>
-    <div class="row"><input type="text" id="oCode" maxlength="6" placeholder="Room code" autocapitalize="characters" style="text-transform:uppercase"><button class="btn" id="oJoin">Join</button></div>
+    <div class="row"><input type="text" id="oCode" placeholder="Room code" autocapitalize="characters" style="text-transform:uppercase"><button class="btn" id="oJoin">Join</button></div>
     <div class="muted" style="font-size:13.5px;min-height:18px" id="oMsg">${waiting ? "Waiting for the host to let you in…" : st === "closed" ? "The room was closed." : ""}</div>
     <button class="btn" id="oBack">Back to the computer</button></div>`;
   const name = () => { const n = $("#oName").value.trim() || "Player"; S.name = n; save(); return n; };
@@ -505,8 +548,10 @@ function renderOnline(snap) {
     const r = await online.createRoom({ name: name(), seats: ["human", "empty"], options: { size: S.size, popout: !!S.popout, first: 0, level: S.level } });
     if (!r.ok) $("#oMsg").textContent = r.message;
   };
+  // codes are 5 letters/digits: drop spaces and dashes people paste, then limit the length
+  $("#oCode").oninput = (e) => { const v = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 5); if (v !== e.target.value) e.target.value = v; };
   $("#oJoin").onclick = async () => {
-    const code = $("#oCode").value.trim().toUpperCase();
+    const code = $("#oCode").value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 5);
     if (!code) { $("#oMsg").textContent = "Type the room code first."; return; }
     $("#oMsg").textContent = "Joining…";
     const r = await online.joinRoom(code, name());
@@ -527,17 +572,22 @@ initStudy({ ordinal });
 initTable();
 const startTab = (location.hash || "#play").slice(1);
 history.replaceState({ tab: startTab }, "", "#" + startTab);
-newLocalGame("computer");
+let hadRoom = false;
+try { hadRoom = !!JSON.parse(localStorage.getItem("online.connect-four") || "null"); } catch (e) {}
+P.resuming = hadRoom;
+if (S.current) newLocalGame(S.current.mode, { level: S.current.level, resume: S.current });
+else newLocalGame("computer");
 goTab(startTab, false);
 getOnline().resume().then((back) => {
-  if (!back) return;
+  P.resuming = false;
+  if (!back) { if (hadRoom && P.snap && P.snap.pub) render(P.snap, { animate: false }); return; }
   P.gen++;
   if (P.room && P.room.close && P.mode !== "online") P.room.close();
   P.mode = "online"; P.room = online;
   const s = P.lastOnline || { status: "none" };
   if (s.options) { const [W, H] = sizeOf(s.options); loadMainThreadSolver(W, H); }
   render(s);
-}).catch(() => {});
+}).catch(() => { P.resuming = false; if (P.snap && P.snap.pub) render(P.snap, { animate: false }); });
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {

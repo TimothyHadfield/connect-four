@@ -178,7 +178,7 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
 .study .stage { flex: 1 1 auto; }
 .stepper { flex: none; display: flex; gap: 6px; align-items: center; }
 .stepper .btn { min-width: 44px; padding: 6px; }
-.stepper input[type=range] { flex: 1; accent-color: var(--accent); }
+.stepper input[type=range] { flex: 1; min-width: 0; width: 0; accent-color: var(--accent); }
 .moves { flex: 0 0 auto; max-height: 15dvh; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
 .mv { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 3px 7px; font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .mv.cur { border-color: var(--accent); background: rgba(110,168,254,.12); }

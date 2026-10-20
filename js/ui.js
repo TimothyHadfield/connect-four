@@ -4,15 +4,13 @@ export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&a
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+import { cleanSettings } from "./saved.js";
+
 const KEY = "c4:v1";
-const DEFAULTS = {
-  size: "7x6", popout: false, level: "medium", starts: "you", showSolver: true, anim: true, threats: false,
-  name: "", nextStart: 0, record: {}, history: [], puzzle: { solved: [] },
-};
 export const S = (() => {
-  let s = {};
-  try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { s = {}; }
-  return Object.assign(structuredClone(DEFAULTS), s);
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(KEY)); } catch (e) { s = null; }
+  return cleanSettings(s);
 })();
 export function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* private mode: keep going */ } }
 
@@ -40,7 +38,7 @@ export function help(title, body) {
 }
 export const q = (key) => `<button class="q" data-help="${key}" aria-label="Why?">?</button>`;
 
-export const BUILD = "1";
+export const BUILD = "2";
 export function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 /** Hooks the page controller fills in (avoids importing app.js, which would load a second copy). */
 export const hooks = { settingsChanged: () => {} };
