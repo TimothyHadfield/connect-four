@@ -24,6 +24,7 @@ export function renderSettings() {
       <div class="set-row"><span>Drop animation</span><label class="switch"><input type="checkbox" id="sAnim" ${S.anim ? "checked" : ""}><span></span></label></div>
       <div class="set-row"><span>Name for online</span><input type="text" id="sName" maxlength="20" value="${esc(S.name)}" placeholder="Your name" style="max-width:180px"></div>
     </div>
+    <div class="panel"><h2>Sound &amp; effects</h2><div id="sFx"></div></div>
     ${rec.length ? `<div class="panel"><h2>Your record vs the computer</h2><table class="strength"><tr><th>Level · board</th><th>Won</th><th>Drawn</th><th>Lost</th></tr>
       ${rec.map(([k, r]) => { const [lv, sz, pop] = k.split(":"); return `<tr><td>${LEVEL_NAMES[lv] || lv} · ${sz.replace("x", "×")}${pop ? " Pop" : ""}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td></tr>`; }).join("")}</table></div>` : ""}
     <div class="panel"><h2>Rules</h2><div class="muted" style="font-size:14px;display:flex;flex-direction:column;gap:6px">
@@ -34,6 +35,7 @@ export function renderSettings() {
       <p style="margin:0">Opening results on the classic board come from John Tromp's 8-ply Connect-4 database (UCI Machine Learning Repository, CC BY 4.0). The solver follows the method Pascal Pons describes at blog.gamesolver.org. Board and disc art drawn for this site.</p>
       <p style="margin:0">Connect Four is a Hasbro trademark; this is a free fan-made study tool. Build ${BUILD}.</p></div></div>
   </div>`;
+  if (window.FX) window.FX.renderSettings($("#sFx"));
   const seg = (id, key, after) => el.querySelectorAll(`#${id} button`).forEach((b) => (b.onclick = () => { S[key] = b.dataset.k; save(); renderSettings(); if (after) settingsChanged(after); }));
   seg("sSize", "size", "board");
   seg("sLevel", "level", "level");

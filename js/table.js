@@ -4,6 +4,7 @@ import { Board } from "./board.js";
 import { Analyst, chipsFor, bestLine, popChips, colList } from "./analysis.js";
 import { sizeOf } from "./game.js";
 import { hasLine, lineCells } from "./rules.js";
+import { dropSound, refuse, release, boardAnim } from "./sfx.js";
 
 const T = { brush: "auto", starter: 1, cells: null, W: 7, H: 6, stack: [], popout: false, gen: 0 };
 const analyst = new Analyst(21);
@@ -37,7 +38,7 @@ export function initTable() {
   board = new Board($("#tboard"), { onColumn: tap });
   $$("#tBrush button").forEach((b) => (b.onclick = () => { T.brush = b.dataset.k; draw(); }));
   $("#tUndo").onclick = () => { const i = T.stack.pop(); if (i !== undefined) { T.cells[i] = 0; draw(); } };
-  $("#tClear").onclick = () => { T.cells.fill(0); T.stack = []; draw(); };
+  $("#tClear").onclick = () => { const old = T.cells.slice(); T.cells.fill(0); T.stack = []; draw(); release(board, old, T.W, T.H); };
   $("#tStarter").onclick = () => { T.starter = 3 - T.starter; draw(); };
 }
 
@@ -73,18 +74,20 @@ function toMove() {
 function tap(c) {
   const { W, H } = T;
   let r = 0; while (r < H && T.cells[c * H + r]) r++;
-  if (r >= H) { toast("That column is full."); return; }
+  if (r >= H) { refuse($("#tboard")); toast("That column is full."); return; }
   const v = T.brush === "auto" ? (toMove() || 1) : +T.brush;
   T.cells[c * H + r] = v;
   T.stack.push(c * H + r);
   draw();
+  dropSound({ c, r, H, W }, T.ms);
 }
 
 function draw(animate = true) {
   try { localStorage.setItem(tableKey(), JSON.stringify({ W: T.W, H: T.H, cells: T.cells, stack: T.stack, starter: T.starter })); } catch (e) {}
   $$("#tBrush button").forEach((b) => b.classList.toggle("on", b.dataset.k === T.brush));
   $("#tStarter").innerHTML = `${discIcon(T.starter, 16)} ${T.starter === 1 ? "Red" : "Yellow"} started`;
-  board.set(T.cells, { animate: animate && S.anim });
+  board.anim = boardAnim(S.anim);
+  T.ms = board.set(T.cells, { animate: animate && S.anim });
   board.setChips(null);
   board.line(null);
   const [r, y] = counts();

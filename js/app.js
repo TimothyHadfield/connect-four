@@ -1,4 +1,6 @@
 /* Connect Four: page controller (tabs, Play, online rooms, Settings). */
+import "./fx.js";
+import { defineSounds, react, refuse, release, scoreBump, boardAnim } from "./sfx.js";
 import { game, SIZES, setBot, sizeOf } from "./game.js";
 import { createLocal, createOnline } from "./online.js";
 import { Board } from "./board.js";
@@ -79,8 +81,12 @@ root.innerHTML = `
   <aside class="side" id="pside"></aside>
 </div>`;
 
+FX.init({ game: "connect-four", accent: "#6ea8fe" });
+defineSounds();
+FX.onChange(() => settingsChanged("fx"));
+
 const board = new Board($("#pboard"), { onColumn: (c) => onColumn(c) });
-board.anim = S.anim ? 1 : 0;
+board.anim = boardAnim(S.anim);
 
 function curOptions() {
   return { size: S.size, popout: !!S.popout, level: P.level };
@@ -112,7 +118,10 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   P.room.on("change", (s) => { if (!P.silent) render(s); });
   P.room.on("error", (e) => toast(e.message || String(e)));
   const [W, H] = sizeOf(P.options);
+  const old = { cells: board.cells.slice(), W: board.W, H: board.H };
+  P.fxPrev = null;
   board.build(W, H);
+  if (!resume) release(board, old.cells, old.W, old.H);
   bot.warm(W, H);
   if (!resume) { P.room.start(); return; }
   P.silent = true;
@@ -147,6 +156,7 @@ function replayTo(moves) {
   for (const m of moves) P.room.act(m.d ? { draw: true } : m.p ? { c: m.c, p: true } : { c: m.c }, m.s);
   P.silent = false;
   P.saved = false;
+  P.fxPrev = null;
   render(P.room.view(P.room.state.turn), { animate: false });
 }
 
@@ -170,9 +180,9 @@ function isMyTurn() {
 function onColumn(c) {
   const s = P.snap;
   if (!s || !s.pub) return;
-  if (s.pub.result) { toast("Game over. Tap New game."); return; }
+  if (s.pub.result) { refuse(null); toast("Game over. Tap New game."); return; }
   if (P.resuming) { toast("Reconnecting to your room…"); return; }
-  if (!isMyTurn()) { toast(P.mode === "computer" ? "Wait for the computer." : "Not your turn."); return; }
+  if (!isMyTurn()) { refuse(null); toast(P.mode === "computer" ? "Wait for the computer." : "Not your turn."); return; }
   const wait = P.animUntil - 120 - performance.now();
   if (wait > 0) {
     // the last disc is still falling: play this tap as soon as it lands
@@ -185,10 +195,10 @@ function onColumn(c) {
   const { W, H, cells } = s.pub;
   let a;
   if (P.popMode) {
-    if (cells[c * H] !== disc(seat)) { toast("Pop only your own bottom disc."); return; }
+    if (cells[c * H] !== disc(seat)) { refuse($("#pboard")); toast("Pop only your own bottom disc."); return; }
     a = { c, p: true };
   } else {
-    if (cells[c * H + H - 1]) { toast("That column is full."); return; }
+    if (cells[c * H + H - 1]) { refuse($("#pboard")); toast("That column is full."); return; }
     a = { c };
   }
   P.popMode = false;
@@ -209,6 +219,8 @@ function render(snap, { animate = true } = {}) {
   const pub = snap.pub;
   if (!pub) return;
   if (board.W !== pub.W || board.H !== pub.H) { board.build(pub.W, pub.H); animate = false; }
+  const fxPrev = P.fxPrev;
+  P.fxPrev = pub;
   const ms = board.set(pub.cells, { animate: animate && S.anim });
   P.animUntil = performance.now() + ms;
   board.line(pub.result ? pub.result.line : null);
@@ -218,6 +230,12 @@ function render(snap, { animate = true } = {}) {
   renderPlayers(snap);
   renderStatus(snap);
   renderActions(snap);
+  // sounds + effects for the move that just happened (online: the other player's moves too)
+  const gen = P.gen;
+  react(fxPrev, pub, {
+    mode: P.mode, me: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
+    level: P.level, animMs: ms, board, status: $("#pstatus"), players: $$("#pl .pl"), alive: () => gen === P.gen,
+  });
   board.setChips(null);
   P.cols = null; P.pop = null;
   $("#pverdict").textContent = "";
@@ -419,6 +437,12 @@ function onFinished(snap) {
     if (w < 0) r.d++; else if (w === P.human) r.w++; else r.l++;
     S.record[k] = r;
     renderPlayers(snap);
+    if (w >= 0) {
+      // the score counts up once the last disc has landed
+      const sc = $$("#pl .pl")[w] && $$("#pl .pl")[w].querySelector(".sc");
+      const to = w === P.human ? r.w : r.l, gen = P.gen;
+      if (sc) { sc.textContent = to - 1; setTimeout(() => { if (gen === P.gen) scoreBump(sc, to - 1, to, w === P.human ? "var(--good)" : "var(--bad)"); }, Math.max(0, P.animUntil - performance.now()) + 80); }
+    }
   }
   if (P.mode === "friends" && firstTime) S.nextStart = 1 - (pub.first || 0);
   const id = P.mode === "online" ? Date.now() : P.gameId;
@@ -506,6 +530,7 @@ function openOnline() {
   if (P.room && P.mode !== "online" && P.room.close) P.room.close();
   P.mode = "online";
   P.room = getOnline();
+  P.fxPrev = null;
   P.onlineView = "home";
   renderOnline({ status: "none" });
 }
@@ -584,7 +609,7 @@ getOnline().resume().then((back) => {
   if (!back) { if (hadRoom && P.snap && P.snap.pub) render(P.snap, { animate: false }); return; }
   P.gen++;
   if (P.room && P.room.close && P.mode !== "online") P.room.close();
-  P.mode = "online"; P.room = online;
+  P.mode = "online"; P.room = online; P.fxPrev = null;
   const s = P.lastOnline || { status: "none" };
   if (s.options) { const [W, H] = sizeOf(s.options); loadMainThreadSolver(W, H); }
   render(s);
@@ -592,7 +617,7 @@ getOnline().resume().then((back) => {
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {
-  board.anim = S.anim ? 1 : 0;
+  board.anim = boardAnim(S.anim);
   if (what === "board" && P.mode !== "online") newLocalGame(P.mode === "friends" ? "friends" : "computer");
   if (what === "solver" && P.snap && P.snap.pub && !P.snap.pub.result) { if (!S.showSolver) { board.setChips(null); $("#pverdict").textContent = ""; analyst.cancel(); } else refreshAnalysis(); }
 }
