@@ -5,6 +5,8 @@
 
 const NS = "http://www.w3.org/2000/svg";
 const CELL = 100, PAD = 18, TOP = 96, FOOT = 34;
+// the real stand: a leg clipped on each side edge (post + wide foot), a slider bar under the grid
+const LEG = 14, FLARE = 15, SIDE = LEG + FLARE;
 let uid = 0;
 
 function el(tag, attrs = {}, parent) {
@@ -35,7 +37,7 @@ export class Board {
     this.cells = new Array(W * H).fill(0);
     const vw = W * CELL + 2 * PAD, vh = TOP + H * CELL + 2 * PAD + FOOT;
     this.host.innerHTML = "";
-    const svg = el("svg", { viewBox: `0 0 ${vw} ${vh}`, class: "board-svg", role: "img", "aria-label": `Board ${W} columns by ${H} rows` }, this.host);
+    const svg = el("svg", { viewBox: `${-SIDE} 0 ${vw + 2 * SIDE} ${vh}`, class: "board-svg", role: "img", "aria-label": `Board ${W} columns by ${H} rows` }, this.host);
     this.svg = svg;
     const id = "b" + ++uid;
     const defs = el("defs", {}, svg);
@@ -43,15 +45,16 @@ export class Board {
       <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a74ea"/><stop offset="1" stop-color="#2052c4"/></linearGradient>
       <radialGradient id="${id}r" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ff7b72"/><stop offset="1" stop-color="#d0313a"/></radialGradient>
       <radialGradient id="${id}y" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f0b429"/></radialGradient>
-      <radialGradient id="${id}h" cx="50%" cy="62%" r="62%"><stop offset="0" stop-color="#14295a"/><stop offset=".7" stop-color="#0c1a3c"/><stop offset="1" stop-color="#070f26"/></radialGradient>
-      <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2858c8"/><stop offset="1" stop-color="#173c94"/></linearGradient>
+      <radialGradient id="${id}h" cx="50%" cy="60%" r="60%"><stop offset="0" stop-color="#0a1230" stop-opacity=".22"/><stop offset=".72" stop-color="#081028" stop-opacity=".42"/><stop offset="1" stop-color="#050a1c" stop-opacity=".72"/></radialGradient>
+      <linearGradient id="${id}t" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1b44a6"/><stop offset=".45" stop-color="#3a74ea"/><stop offset="1" stop-color="#1a409c"/></linearGradient>
+      <linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a5fd6"/><stop offset=".5" stop-color="#1c46aa"/><stop offset="1" stop-color="#143583"/></linearGradient>
       <clipPath id="${id}c"><rect x="0" y="0" width="${vw}" height="${TOP + PAD + H * CELL}"/></clipPath>`;
     this.gradR = `url(#${id}r)`; this.gradY = `url(#${id}y)`;
     // top row: chips / preview
     this.chips = el("g", { class: "chips" }, svg);
-    // back of the slot: each hole shaded darker at the rim, so it reads as a hollow
+    // the grid is see-through, as the real one: the table behind shows through each hole,
+    // shaded darker at the rim so it still reads as a hollow
     const back = el("g", {}, svg);
-    el("rect", { x: PAD, y: TOP + PAD, width: W * CELL, height: H * CELL, fill: "#0b1734" }, back);
     for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) { const [x, y] = this.xy(c, r); el("circle", { cx: x, cy: y, r: 40, fill: `url(#${id}h)` }, back); }
     this.discLayer = el("g", { "clip-path": `url(#${id}c)` }, svg);
     // frame with holes
@@ -67,10 +70,38 @@ export class Board {
     const lips = el("g", { fill: "none", stroke: "rgba(255,255,255,.16)", "stroke-width": "2.5", "stroke-linecap": "round" }, svg);
     for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) { const [x, y] = this.xy(c, r); el("path", { d: `M${x - 30} ${y + 27} A40 40 0 0 0 ${x + 30} ${y + 27}` }, lips); }
     el("rect", { x: 3, y: TOP + 3, width: vw - 6, height: H * CELL + 2 * PAD - 6, rx: 5, fill: "none", stroke: "rgba(255,255,255,.18)", "stroke-width": 3 }, svg);
-    // feet, with a soft shadow on the "table"
-    const fy = TOP + H * CELL + 2 * PAD;
-    el("ellipse", { cx: vw / 2, cy: fy + FOOT - 3, rx: vw / 2 - 10, ry: 5, fill: "rgba(0,0,0,.45)" }, svg);
-    for (const fx of [PAD + 10, vw - PAD - 70]) el("path", { d: `M${fx} ${fy} h60 l11 ${FOOT - 7} q1 4 -3 4 h-76 q-4 0 -3 -4 Z`, fill: `url(#${id}t)` }, svg);
+    // moulded ridges between the columns, and the drop slot on top of each column
+    const ridges = el("g", { "stroke-width": 2.5 }, svg);
+    for (let c = 1; c < W; c++) {
+      const x = PAD + c * CELL;
+      el("line", { x1: x - 1.5, y1: TOP + 16, x2: x - 1.5, y2: TOP + H * CELL + 2 * PAD - 10, stroke: "rgba(255,255,255,.08)" }, ridges);
+      el("line", { x1: x + 1.5, y1: TOP + 16, x2: x + 1.5, y2: TOP + H * CELL + 2 * PAD - 10, stroke: "rgba(0,0,0,.12)" }, ridges);
+    }
+    for (let c = 0; c < W; c++) {
+      const x = PAD + c * CELL + CELL / 2;
+      el("rect", { x: x - 33, y: TOP + 3, width: 66, height: 7, rx: 3.5, fill: "rgba(4,10,30,.78)" }, svg);
+      el("line", { x1: x - 31, y1: TOP + 11.5, x2: x + 31, y2: TOP + 11.5, stroke: "rgba(255,255,255,.22)", "stroke-width": 1.5 }, svg);
+    }
+    // the stand as on a real table: slider bar under the grid (tab out at the left), a leg on each
+    // side (post up the side edge, wide foot on the table) and the grid's soft shadow on the table
+    const fy = TOP + H * CELL + 2 * PAD, ty = vh - 2;
+    el("ellipse", { cx: vw / 2, cy: ty - 1, rx: vw / 2 + SIDE - 10, ry: 5, fill: "rgba(0,0,0,.3)" }, svg);
+    for (const fx of [-SIDE + 48, vw + SIDE - 48]) el("ellipse", { cx: fx, cy: ty, rx: 56, ry: 5, fill: "rgba(0,0,0,.45)" }, svg);
+    for (const left of [true, false]) {
+      // post up the side edge of the grid, on a wide flared foot
+      const X = (x) => (left ? x : vw - x);
+      const post = left ? -LEG : vw - 3;
+      el("rect", { x: post, y: TOP + 10, width: LEG + 3, height: ty - TOP - 22, rx: 4, fill: `url(#${id}t)`, stroke: "rgba(0,0,0,.22)", "stroke-width": 1.5 }, svg);
+      el("rect", { x: left ? post + 3 : post + LEG - 3, y: TOP + 16, width: 3, height: ty - TOP - 36, rx: 1.5, fill: "rgba(255,255,255,.2)" }, svg);
+      el("path", { d: `M${X(-SIDE)} ${ty} L${X(-LEG - 3)} ${ty - 18} H${X(58)} L${X(76)} ${ty} Z`, fill: `url(#${id}s)`, stroke: "rgba(0,0,0,.25)", "stroke-width": 1.5, "stroke-linejoin": "round" }, svg);
+      el("line", { x1: X(-LEG - 1), y1: ty - 16, x2: X(57), y2: ty - 16, stroke: "rgba(255,255,255,.22)", "stroke-width": 1.5 }, svg);
+    }
+    this.slider = el("g", {}, svg);
+    el("rect", { x: 6, y: fy - 3, width: vw - 12, height: 16, rx: 4, fill: `url(#${id}s)` }, this.slider);
+    el("rect", { x: 10, y: fy - 1, width: vw - 20, height: 2.5, rx: 1, fill: "rgba(255,255,255,.22)" }, this.slider);
+    // pull tab sticking out at the left end, with grip ridges
+    el("rect", { x: -SIDE - 14, y: fy - 6, width: SIDE + 26, height: 22, rx: 5, fill: `url(#${id}s)`, stroke: "rgba(0,0,0,.3)", "stroke-width": 1.5 }, this.slider);
+    for (let k = 0; k < 3; k++) el("line", { x1: -SIDE - 8 + k * 6, y1: fy - 1, x2: -SIDE - 8 + k * 6, y2: fy + 11, stroke: "rgba(0,0,0,.3)", "stroke-width": 2 }, this.slider);
     this.marks = el("g", { class: "marks" }, svg);
     // hover tint: only over the frame, never over the chip row
     const hl = el("rect", { x: PAD, y: TOP + 4, width: CELL, height: H * CELL + 2 * PAD - 8, rx: 10, class: "col-hl" }, svg);
@@ -176,6 +207,14 @@ export class Board {
       if (g.firstChild.animate) g.firstChild.animate([{ transform: `translate(0px, ${-CELL}px)`, easing: "cubic-bezier(.5,0,1,1)" }, { transform: "translate(0px,0px)" }], { duration: ms * 0.7, delay: ms * 0.25, fill: "backwards" });
     }
     return ms;
+  }
+
+  /** The slider bar pulls out to the left and springs back (New game / Clear). */
+  slide() {
+    const g = this.slider;
+    if (!g || !g.animate || !this.anim) return;
+    g.animate([{ transform: "translateX(0px)" }, { transform: "translateX(-46px)", offset: 0.35 }, { transform: "translateX(-46px)", offset: 0.7 }, { transform: "translateX(0px)" }],
+      { duration: 700 * this.anim, easing: "ease-in-out" });
   }
 
   /** Ring the winning discs. */

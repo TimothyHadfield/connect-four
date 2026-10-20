@@ -16,10 +16,11 @@ A Connect Four site in the board-games family: play the computer at measured lev
 | Study | Review (tags Best…Blunder, points lost, threats), 27 puzzles, Lab (opening map, Tromp size table, cell power, strength table). |
 | Table tab | Copy a real board; verdict per column. |
 | Online | Shared `../_online/online.js` (security fix of 2026-10-20 included, commit 0b193d8 of _online), gameId "connect-four". Two-browser test passes on LIVE site 2026-10-20. |
-| Tests | `npm test` 41/41 (about 40 s). Every test seen failing on a mutated engine. Browser checks: `node tools/regress.mjs [url]` (12 checks from the QA pass; all 11 bug checks failed on build 1, all pass on build 2). |
+| Tests | `npm test` 45/45 (about 40 s; tests/seats.test.js added in build 5). Every test seen failing on a mutated engine. Browser checks: `node tools/regress.mjs [url]` (12 checks from the QA pass; all 11 bug checks failed on build 1, all pass on build 2). |
 | Done gate | Tests, live smoke (phone + desktop, 0 errors, 0 failed requests, no overflow), live two-browser online, QA pass + fixes (build 2): 2026-10-20. |
 | Design pass (build 3) | 2026-10-20: board art (shaded holes, light lip, disc highlight, feet + shadow), win dims the other discs, hover tint only on the frame, status/verdict fixed heights (board never moves at game end, measured 0 px), bigger laptop status/players, Study side panels on laptop, review picker ellipsis, 40px "?" tap area, online card at the top, size-table glyphs bigger. Before/after shots in the manager's scratchpad `design/connect-four/`. |
-| Sound & effects (build 4) | 2026-10-20: js/fx.js (shared _fx 1.0.2, never edit here) + js/sfx.js (event → sound map, custom sounds). Settings › "Sound & effects". Tests: tests/fx.test.js (15). Map below. |
+| Real-table look (build 5) | 2026-10-20: Play tab is a wooden table (shared `_table` kit: css/table.css + js/game-table.js, byte-for-byte copies; the kit's table.js is renamed game-table.js because js/table.js is this site's Table tab). Board drawn like the real grid: see-through holes, drop slot on each column, ridges, side legs on flared feet, slider bar with pull tab (slides out on New game / Clear). Each player's own discs lie in stacks of 7 at their seat (js/seats.js): yours at the near edge, the opponent's across the table; stacks shrink as discs are played (a disc lifts off), refill on a pop. Phone landscape puts the seats left/right of the board. Research: manager scratchpad `table/connect-four/real.md`, before/after shots there. |
+| Sound & effects (build 4) | 2026-10-20: js/fx.js (shared _fx 1.0.3 since build 5, never edit here) + js/sfx.js (event → sound map, custom sounds). Settings › "Sound & effects". Tests: tests/fx.test.js (15). Map below. |
 | Saved data (js/saved.js) | Every field of `c4:v1` checked on load; history and the unfinished game replayed through the rules, bad ones dropped. Unfinished local game restored on reload (`S.current`). Table keeps one board per size (`c4:table:WxH`). |
 
 ## Standing instructions
@@ -27,6 +28,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - Tim (for all games): online play "with a computer or other online players … that match exactly the play of the in-person game." $0, static Pages only.
 - Tim owns looks, wording and names; don't restyle uninvited.
 - Tim (all games, 2026-10-20): "add opptional sounds you can add to the games that reflect what's happening in the game accurately as well as win celebrations, and other fun annimations to go along with everything. Just make sure everything is customizable in the settings so the user can play as preffered."
+- Tim (all games, 2026-10-20): "could you also make sure that each of the games also have a look to them so that the game (either board or card layout) looks almost identical to how the board or card layout looks like in real life, so it's easy to understand if you've already played it before, and also so it feels more like you're actually playing in real life rather than you're playing it online. Even things like how youre cards or other things are laid out infront of you, make it look like they are actual cards laid out similar to how it looks like in real life. Make the decks look like actual decks. Make the board have the same design as it does in real life with the same layouts. It should look kind of like you're looking through a camera that is connected to a user's glasses that is playing in real life (not actually, but the layout and style of everything should be similar)."
 
 ## Event → sound map (js/sfx.js)
 | Event | Sound | Animation |
@@ -52,6 +54,8 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - The computer's "busy" flag is a game number (`P.botGen`), not a boolean: a boolean got stuck when a new game started mid-think and the computer never moved again (QA 2026-10-20).
 - The record counts each game once (`P.gameId` survives Undo); a re-finished game replaces its history entry.
 - fx.js's injected CSS has the same specificity as this site's `.switch` / `.seg` rules and loads later, so it wins: the `.fx-set …` block at the end of style.css puts the site's look back. Keep it when re-copying fx.js.
+- Shared copies (js/fx.js, js/game-table.js, css/table.css) are marked `-text` in .gitattributes so Windows merges can't turn them CRLF; after a merge check they still `cmp` equal to `../_fx/fx.js`, `../_table/table.js`, `../_table/table.css`.
+- `#pl` is `display: contents`: its two `.pl` seats stay in seat order (sfx.js and the score bump index them by seat) while CSS `order` puts the far seat above the board and yours below.
 - FX.celebrate plays its fanfare through fx.js's own play(), so a spy on FX.play can't see it; tests/fx.test.js counts it from FX.stats.plays.
 - Exact win distances early in a game can take up to a minute; the Table tab caps the budget at 4e6 nodes, Review at 1.5e6.
 
@@ -61,6 +65,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - 5×4 board added beyond the brief's list (small, fully solvable, good for learning).
 - Solver chips shown by default on Play (switch in Settings).
 - Strength measured from random 2-disc openings played twice with colours swapped.
+- Table look (build 5, Tim's call to change): dark wood table; discs kept in stacks of 7; friends mode puts Red at the near edge; buttons and tab bar stay app-style, off the table; win rings/dimming and last-move dot kept.
 - Pop 10 and special editions not built (docs/rules-check.md "Not built").
 
 ## NOT verified
@@ -68,4 +73,5 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - "Perfect" is truly perfect only when the solver finishes in time: in 1 of 900 measured games it did worse than its start allowed; on 9×7 and Pop Out it looks ahead and can be beaten (said in Help).
 - Pop Out analysis is heuristic, not solved.
 - Sounds never heard by ear: headless WebKit on Windows has no Web Audio, so checks used a fake AudioContext (which sounds fire, when). Loudness/feel on a real iPhone not checked.
+- Table look (build 5): the slider slide-out and disc lift-off seen only as running animations in headless WebKit, not by eye on a phone.
 - Online sounds (opponent's disc + your-turn chime from the snapshot) tested in node with the online seat logic, not in a live two-browser run.

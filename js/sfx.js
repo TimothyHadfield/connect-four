@@ -193,6 +193,7 @@ export function release(board, oldCells, oldW, oldH) {
   if (!animOn() || !board || board.W !== oldW || board.H !== oldH || !board.discLayer) return 0;
   const sp = speed();
   const H = board.H;
+  if (board.slide) board.slide(); // the slider bar pulls out, then the discs drop
   let longest = 0;
   for (let i = 0; i < oldCells.length; i++) {
     if (!oldCells[i]) continue;

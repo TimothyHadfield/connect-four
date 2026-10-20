@@ -13,6 +13,7 @@ import { HELP } from "./help.js";
 import { initStudy, showStudy, studyGame } from "./study.js";
 import { initTable, showTable } from "./table.js";
 import { renderSettings } from "./settings.js";
+import { seatHTML, discsLeft, discsEach, liftOff } from "./seats.js";
 
 const COLOR = ["Red", "Yellow"];
 const disc = (seat) => (seat === 0 ? 1 : 2);
@@ -64,11 +65,13 @@ const root = $("#tab-play");
 root.innerHTML = `
 <div class="play-grid">
   <div class="play-main">
-    <div class="players" id="pl"></div>
-    <div class="stage" id="pstage"><div class="board-host" id="pboard"></div></div>
-    <div id="ponline" class="online-wrap" hidden></div>
-    <div class="status" id="pstatus"></div>
-    <div class="verdict" id="pverdict"></div>
+    <div class="tabletop tbl-surface tbl-wood-dark" id="ptable">
+      <div class="players" id="pl"></div>
+      <div class="stage" id="pstage"><div class="board-host" id="pboard"></div></div>
+      <div id="ponline" class="online-wrap" hidden></div>
+      <div class="status" id="pstatus"></div>
+      <div class="verdict" id="pverdict"></div>
+    </div>
     <div class="actions" id="pactions">
       <button class="btn" id="bHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Hint</button>
       <button class="btn" id="bUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
@@ -246,6 +249,19 @@ function render(snap, { animate = true } = {}) {
     refreshAnalysis();
   }
   renderSide();
+  // the disc just played came off its player's stacks
+  const m = pub.moves[pub.moves.length - 1];
+  if (animate && S.anim && fxPrev && m && !m.p && !m.d && pub.moves.length === fxPrev.moves.length + 1) {
+    const near = nearSeat(snap);
+    liftOff($$("#pl .pl")[m.s], disc(m.s), discsLeft(pub.cells, disc(m.s), pub.W, pub.H), discsEach(pub.W, pub.H), "c4:" + m.s, m.s === near ? "up" : "down");
+  }
+}
+
+/** The seat at the near edge of the table (yours). */
+function nearSeat(snap) {
+  if (P.mode === "computer") return P.human;
+  if (P.mode === "online") return snap.mySeat >= 0 ? snap.mySeat : 0;
+  return 0;
 }
 
 function lastCell(pub) {
@@ -264,14 +280,16 @@ function popCols(pub) {
 function renderPlayers(snap) {
   const pub = snap.pub;
   const rec = matchScore();
+  const wide = matchMedia("(min-width: 900px)").matches;
   $("#pl").innerHTML = [0, 1].map((i) => {
     const seat = snap.seats[i] || {};
     let sub = COLOR[i];
     if (P.mode === "computer") sub = i === P.comp ? LEVEL_NAMES[P.level] : COLOR[i];
     if (P.mode === "online") sub = seat.kind === "computer" ? "Computer" : seat.online ? (i === snap.mySeat ? "You" : "Online") : "Away";
     const turn = !pub.result && pub.turn === i;
-    const sc = rec ? `<span class="sc">${i === P.human ? rec.w : rec.l}</span>` : "";
-    return `<div class="pl ${turn ? "turn" : ""}">${discIcon(disc(i), 22)}<span class="nm">${esc(seat.name || COLOR[i])}<small>${esc(sub)}</small></span>${P.mode === "computer" ? sc : ""}</div>`;
+    const near = i === nearSeat(snap);
+    return seatHTML({ v: disc(i), left: discsLeft(pub.cells, disc(i), pub.W, pub.H), total: discsEach(pub.W, pub.H), name: seat.name || COLOR[i], sub,
+      score: rec ? (i === P.human ? rec.w : rec.l) : null, turn, near, h: wide ? (near ? 60 : 44) : near ? 46 : 32, seed: "c4:" + i });
   }).join("");
 }
 
