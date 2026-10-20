@@ -1,0 +1,12 @@
+{
+  "name": "connect-four",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "build:wasm": "asc wasm/solver.ts -o js/solver.wasm -O3 --runtime stub --noAssert --initialMemory 4 --maximumMemory 16384"
+  },
+  "devDependencies": {
+    "assemblyscript": "0.27.31"
+  }
+}
