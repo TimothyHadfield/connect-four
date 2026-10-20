@@ -17,7 +17,7 @@ function el(tag, attrs = {}, parent) {
 export function discSvg(v, size = 22) {
   const id = "dg" + ++uid;
   const [a, b, ring] = v === 1 ? ["#ff7b72", "#d0313a", "#a82029"] : ["#ffe27a", "#f0b429", "#c98d0c"];
-  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><defs><radialGradient id="${id}" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><circle cx="50" cy="50" r="47" fill="url(#${id})"/><circle cx="50" cy="50" r="31" fill="none" stroke="${ring}" stroke-width="5" opacity=".75"/><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/></svg>`;
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><defs><radialGradient id="${id}" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><circle cx="50" cy="50" r="47" fill="url(#${id})"/><circle cx="50" cy="50" r="31" fill="none" stroke="${ring}" stroke-width="5" opacity=".75"/><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/><ellipse cx="36" cy="30" rx="16" ry="9" fill="#fff" opacity=".32" transform="rotate(-28 36 30)"/></svg>`;
 }
 
 export class Board {
@@ -43,12 +43,16 @@ export class Board {
       <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a74ea"/><stop offset="1" stop-color="#2052c4"/></linearGradient>
       <radialGradient id="${id}r" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ff7b72"/><stop offset="1" stop-color="#d0313a"/></radialGradient>
       <radialGradient id="${id}y" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f0b429"/></radialGradient>
+      <radialGradient id="${id}h" cx="50%" cy="62%" r="62%"><stop offset="0" stop-color="#14295a"/><stop offset=".7" stop-color="#0c1a3c"/><stop offset="1" stop-color="#070f26"/></radialGradient>
+      <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2858c8"/><stop offset="1" stop-color="#173c94"/></linearGradient>
       <clipPath id="${id}c"><rect x="0" y="0" width="${vw}" height="${TOP + PAD + H * CELL}"/></clipPath>`;
     this.gradR = `url(#${id}r)`; this.gradY = `url(#${id}y)`;
     // top row: chips / preview
     this.chips = el("g", { class: "chips" }, svg);
-    // back of the slot (darker blue seen through holes)
-    el("rect", { x: PAD, y: TOP + PAD, width: W * CELL, height: H * CELL, fill: "#0d1a3a" }, svg);
+    // back of the slot: each hole shaded darker at the rim, so it reads as a hollow
+    const back = el("g", {}, svg);
+    el("rect", { x: PAD, y: TOP + PAD, width: W * CELL, height: H * CELL, fill: "#0b1734" }, back);
+    for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) { const [x, y] = this.xy(c, r); el("circle", { cx: x, cy: y, r: 40, fill: `url(#${id}h)` }, back); }
     this.discLayer = el("g", { "clip-path": `url(#${id}c)` }, svg);
     // frame with holes
     let d = `M0 ${TOP + 6} q0 -6 6 -6 H${vw - 6} q6 0 6 6 V${TOP + H * CELL + 2 * PAD - 6} q0 6 -6 6 H6 q-6 0 -6 -6 Z`;
@@ -59,16 +63,24 @@ export class Board {
     el("path", { d, fill: `url(#${id}f)`, "fill-rule": "evenodd" }, svg);
     const rims = el("g", { fill: "none", stroke: "rgba(0,0,0,.28)", "stroke-width": "4" }, svg);
     for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) { const [x, y] = this.xy(c, r); el("circle", { cx: x, cy: y + 1.5, r: 40 }, rims); }
+    // lip of light under each hole (the frame's thickness catching the light)
+    const lips = el("g", { fill: "none", stroke: "rgba(255,255,255,.16)", "stroke-width": "2.5", "stroke-linecap": "round" }, svg);
+    for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) { const [x, y] = this.xy(c, r); el("path", { d: `M${x - 30} ${y + 27} A40 40 0 0 0 ${x + 30} ${y + 27}` }, lips); }
     el("rect", { x: 3, y: TOP + 3, width: vw - 6, height: H * CELL + 2 * PAD - 6, rx: 5, fill: "none", stroke: "rgba(255,255,255,.18)", "stroke-width": 3 }, svg);
-    // feet
+    // feet, with a soft shadow on the "table"
     const fy = TOP + H * CELL + 2 * PAD;
-    for (const fx of [PAD + 10, vw - PAD - 70]) el("path", { d: `M${fx} ${fy} h60 l12 ${FOOT - 4} h-84 Z`, fill: "#1b46a8" }, svg);
+    el("ellipse", { cx: vw / 2, cy: fy + FOOT - 3, rx: vw / 2 - 10, ry: 5, fill: "rgba(0,0,0,.45)" }, svg);
+    for (const fx of [PAD + 10, vw - PAD - 70]) el("path", { d: `M${fx} ${fy} h60 l11 ${FOOT - 7} q1 4 -3 4 h-76 q-4 0 -3 -4 Z`, fill: `url(#${id}t)` }, svg);
     this.marks = el("g", { class: "marks" }, svg);
+    // hover tint: only over the frame, never over the chip row
+    const hl = el("rect", { x: PAD, y: TOP + 4, width: CELL, height: H * CELL + 2 * PAD - 8, rx: 10, class: "col-hl" }, svg);
     // tap targets
     this.hits = el("g", {}, svg);
     for (let c = 0; c < W; c++) {
       const r = el("rect", { x: PAD + c * CELL, y: 0, width: CELL, height: TOP + H * CELL + 2 * PAD, fill: "transparent", class: "hit", "data-col": c }, this.hits);
       r.addEventListener("click", () => this.opts.onColumn && this.opts.onColumn(c));
+      r.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && matchMedia("(hover: hover)").matches) { hl.setAttribute("x", PAD + c * CELL); hl.classList.add("on"); } });
+      r.addEventListener("pointerleave", () => hl.classList.remove("on"));
     }
     this.discs = new Map(); // cell index -> element
   }
@@ -80,6 +92,7 @@ export class Board {
     g.appendChild(el("circle", { r: 43, fill: v === 1 ? this.gradR : this.gradY }));
     g.appendChild(el("circle", { r: 29, fill: "none", stroke: v === 1 ? "#a82029" : "#c98d0c", "stroke-width": 5, opacity: 0.7 }));
     g.appendChild(el("circle", { r: 43, fill: "none", stroke: "rgba(0,0,0,.22)", "stroke-width": 2 }));
+    g.appendChild(el("ellipse", { cx: -13, cy: -19, rx: 15, ry: 8, fill: "#fff", opacity: 0.32, transform: "rotate(-28 -13 -19)" }));
     return g;
   }
 
@@ -168,6 +181,10 @@ export class Board {
   /** Ring the winning discs. */
   line(cells) {
     this.marks.innerHTML = "";
+    // the winning four stay bright, the rest of the board steps back
+    const win = new Set(cells || []);
+    this.svg.classList.toggle("over", win.size > 0);
+    for (const [i, g] of this.discs) g.classList.toggle("win", win.has(i));
     for (const i of cells || []) {
       const [x, y] = this.xy(Math.floor(i / this.H), i % this.H);
       el("circle", { cx: x, cy: y, r: 44, class: "win-ring" }, this.marks);

@@ -72,7 +72,8 @@ nav.tabs .brand { display: none; }
 .btn.small { min-height: 36px; padding: 5px 10px; font-size: 13.5px; border-radius: 8px; }
 .btn svg { width: 18px; height: 18px; flex: none; }
 .q { display: inline-flex; width: 19px; height: 19px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted);
-  font-size: 12px; font-weight: 700; align-items: center; justify-content: center; cursor: pointer; background: var(--bg-soft); vertical-align: 1px; margin-left: 4px; padding: 0; flex: none; }
+  font-size: 12px; font-weight: 700; align-items: center; justify-content: center; cursor: pointer; background: var(--bg-soft); vertical-align: 1px; margin-left: 4px; padding: 0; flex: none; position: relative; }
+.q::after { content: ""; position: absolute; inset: -11px; } /* 40px tap area */
 .label { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 .muted { color: var(--muted); }
 .row { display: flex; gap: 8px; align-items: center; }
@@ -101,7 +102,7 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .pl .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .pl .nm small { display: block; font-size: 11px; color: var(--muted); font-weight: 550; }
 .pl .sc { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 800; }
-.pl.turn { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pl.turn { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: #1d2539; }
 .pl svg { flex: none; }
 
 /* ---------------------------------------------------------------- board */
@@ -109,10 +110,14 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .board-host { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
 .board-svg { max-width: 100%; max-height: 100%; width: auto; height: 100%; display: block; overflow: visible; user-select: none; -webkit-user-select: none; }
 .board-svg .hit { cursor: pointer; }
-@media (hover: hover) { .board-svg .hit:hover { fill: rgba(255,255,255,.035); } }
+.col-hl { fill: rgba(255,255,255,.07); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.col-hl.on { opacity: 1; }
+.board-svg .disc { transition: opacity .35s; }
+.board-svg.over .disc { opacity: .58; }
+.board-svg.over .win .disc { opacity: 1; }
 .chip rect { fill: var(--bg-soft); stroke: var(--line); stroke-width: 3; }
-.chip-t { font: 800 27px system-ui, -apple-system, sans-serif; fill: var(--text); }
-.chip-s { font: 700 23px system-ui, -apple-system, sans-serif; fill: var(--muted); }
+.chip-t { font: 750 25px system-ui, -apple-system, sans-serif; fill: var(--text); letter-spacing: .01em; }
+.chip-s { font: 650 22px system-ui, -apple-system, sans-serif; fill: var(--muted); }
 .chip.w1 rect { fill: rgba(110,231,168,.22); stroke: #6ee7a8; } .chip.w1 .chip-t, .chip.w1 .chip-s { fill: #8af0bd; }
 .chip.w2 rect { fill: rgba(110,231,168,.12); stroke: #4fae7e; } .chip.w2 .chip-t, .chip.w2 .chip-s { fill: #7fd3a8; }
 .chip.d rect { fill: rgba(240,179,84,.12); stroke: #b98a45; } .chip.d .chip-t { fill: #f0c27a; }
@@ -123,21 +128,23 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .chip.wait .chip-t { fill: var(--muted); }
 .chip.pick rect { stroke: var(--warm); stroke-width: 7; }
 .win-ring { fill: none; stroke: #fff; stroke-width: 7; filter: drop-shadow(0 0 6px rgba(255,255,255,.8)); animation: ring 1.2s ease-in-out infinite alternate; }
-@keyframes ring { from { stroke-opacity: 1; } to { stroke-opacity: .45; } }
+@keyframes ring { from { stroke-opacity: 1; } to { stroke-opacity: .75; } }
 .lastmark { fill: rgba(255,255,255,.75); }
 .popmark { fill: none; stroke: var(--warm); stroke-width: 6; stroke-dasharray: 10 8; }
 .threat { stroke: rgba(0,0,0,.4); stroke-width: 3; }
 .threat.tr { fill: #ff8a8a; } .threat.ty { fill: #ffe07a; }
 .threat.odd { stroke: #fff; stroke-width: 4; }
 
-.status { flex: none; text-align: center; font-weight: 700; font-size: 15px; min-height: 22px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.status { flex: none; text-align: center; font-weight: 750; font-size: 16.5px; height: 28px; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 7px; }
 .status .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .status.win { color: var(--good); } .status.loss { color: var(--bad); }
+.status.win, .status.loss, .status.over { font-size: 19px; }
 .thinking::after { content: ""; display: inline-block; width: 14px; text-align: left; animation: dots 1.2s steps(4) infinite; }
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 .actions { flex: none; display: flex; gap: 6px; }
 .actions .btn { flex: 1; padding: 8px 6px; }
-.verdict { flex: none; font-size: 13.5px; color: var(--muted); text-align: center; min-height: 20px; }
+/* fixed height (two lines, or the Review button) so the board never moves when it changes */
+.verdict { flex: none; font-size: 13.5px; line-height: 19px; color: var(--muted); text-align: center; height: 38px; overflow: hidden; }
 .verdict b { color: var(--text); }
 
 /* ---------------------------------------------------------------- sheets */
@@ -171,8 +178,7 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
 .seat:last-child { border-bottom: 0; }
 .on-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
 .on-dot.on { background: var(--good); }
-.online-wrap { max-width: 460px; width: 100%; margin: auto; display: flex; flex-direction: column; gap: 10px; }
-
+.online-wrap { max-width: 460px; width: 100%; margin: 8px auto auto; display: flex; flex-direction: column; gap: 10px; }
 /* ---------------------------------------------------------------- study */
 .study { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 .study .stage { flex: 1 1 auto; }
@@ -185,8 +191,15 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
 .mv i { width: 10px; height: 10px; border-radius: 50%; }
 .mv .tag { font-size: 11px; font-weight: 750; padding: 0 4px; border-radius: 5px; }
 .tag.best { color: #8af0bd; } .tag.good { color: #b9e39b; } .tag.slow { color: #f0c27a; } .tag.mistake { color: #f7a26b; } .tag.blunder { color: #ff8080; } .tag.wait { color: var(--muted); }
-.summary { flex: none; font-size: 13.5px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.summary { flex: none; font-size: 12.5px; display: flex; gap: 2px 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+.summary > span { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .summary span b { font-variant-numeric: tabular-nums; }
+#stPick { gap: 10px; }
+#stPick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#stPick span:first-child { flex: none; max-width: 70%; }
+/* the move list scrolls; a soft fade shows there is more */
+#stMoves, #pzList { -webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent); mask-image: linear-gradient(#000 calc(100% - 14px), transparent); padding-bottom: 10px; }
+.size-table td:not(:first-child) { font-size: 16px; font-weight: 800; }
 .subtabs { flex: none; display: flex; gap: 6px; }
 .subtabs button { flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 6px 2px; font-weight: 700; cursor: pointer; font-size: 14px; }
 .subtabs button.on { color: var(--text); border-bottom-color: var(--accent); }
@@ -203,6 +216,20 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
   .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
   .study-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
   .moves { max-height: none; flex: 1; }
+  /* Study sub-tabs sit over the board column; the right column is the side panel */
+  #tab-study .subtabs { width: calc(100% - 356px); }
+  .study-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .study-side .summary { flex-direction: column; align-items: flex-start; justify-content: flex-start; font-size: 13.5px; gap: 6px; }
+  .study-side .summary > span { white-space: normal; display: block; }
+  .study-side .summary:not(:empty), .study-side .moves { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  .study-side .moves { flex: 0 1 auto; overflow-y: auto; }
+  .status { font-size: 19px; height: 32px; }
+  .status.win, .status.loss, .status.over { font-size: 22px; }
+  .status svg { width: 20px; height: 20px; }
+  .verdict { font-size: 14.5px; line-height: 19px; }
+  .pl { padding: 8px 12px; font-size: 15px; }
+  .pl .nm small { font-size: 12px; }
+  .pl .sc { font-size: 20px; }
 }
 @media (max-width: 899px) {
   .play-grid, .study-grid { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }

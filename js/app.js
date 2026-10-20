@@ -268,6 +268,7 @@ function renderStatus(snap) {
   const pub = snap.pub, el = $("#pstatus");
   el.className = "status";
   if (pub.result) {
+    el.classList.add("over");
     const w = pub.result.winner;
     if (w < 0) { el.textContent = pub.result.why === "repeat" ? "Draw: same position 3 times" : pub.result.why === "called" ? "Draw called" : "Draw: the board is full"; return; }
     const name = snap.seats[w] ? snap.seats[w].name : COLOR[w];
