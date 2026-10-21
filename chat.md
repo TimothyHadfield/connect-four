@@ -27,3 +27,9 @@
 - **Built:** fx.js re-copied (1.0.3); `_table` kit copied (css/table.css, js/game-table.js); Play tab on a dark wood table; board.js: see-through holes, drop slots, ridges, side legs on flared feet, slider bar with pull tab that slides out on New game / Clear; js/seats.js: each player's discs in stacks of 7 at their seat (yours near, opponent across), shrinking per disc with a lift-off animation; landscape phone puts seats beside the board; .gitattributes keeps the shared copies byte-identical.
 - **Verified:** tests/seats.test.js (failed with the module missing and on two mutations, passes); npm test 45/45 (one unexplained failure in 7 runs, not reproduced); tools/regress.mjs 12/12 local; two-browsers online on the local build PASS; WebKit shots 393×659, 1280×800, 320, 659×393 landscape: 0 errors, no overflow, no page scroll; Effects speed tap leaves the site's own segments alone.
 - **Open:** "Red / Red" friends subtitles and confetti over the buttons (shared fx) left as they were.
+
+## 2026-10-20 — edge pass (build 6)
+- **Asked:** Tim (all games): "Could you focus on making each game perfect especially in scenarios that the game doesn't expect or are a little weird." Also re-copy the `_table` kit (1.0.1).
+- **Built:** `_table` kit re-copied (no flip cards in this game); fixes for 10 odd situations (progress.md "Odd situations"): app.js, ui.js, seats.js, style.css; tools/edge.mjs (24 browser checks), tests/edge.test.js (4).
+- **Verified:** tools/edge.mjs 10 FAIL on build 5 → 24/24 PASS on build 6 (local); stacks check seen failing with the CSS removed; npm test 49/49; regress.mjs 12/12; two-browsers on local and live PASS.
+- **Open:** see progress.md NOT verified (online AFK / host leave not driven).

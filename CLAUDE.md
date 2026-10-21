@@ -3,7 +3,7 @@
 Static site on GitHub Pages: https://timothyhadfield.github.io/connect-four/ (repo TimothyHadfield/connect-four). $0, no build step for the site, ES modules.
 
 - Read `progress.md` first.
-- Browser regressions: `node tools/regress.mjs [url]` (headless WebKit; default the live site).
+- Browser regressions: `node tools/regress.mjs [url]` and odd situations `node tools/edge.mjs [url] [shotDir]` (headless WebKit; default the live site).
 - Tests: `npm test` (node --test "tests/*.test.js"). About 40 s; the random-games and book-vs-solver checks dominate.
 - `js/solver.wasm` is built from `wasm/solver.ts` with `npm run build:wasm` (AssemblyScript, dev dependency only). Commit the .wasm; the site never builds anything.
 - `data/book7x6.bin` comes from `tools/forced-solve.mjs` then `tools/build-book.mjs` (Tromp's UCI 8-ply data, CC BY 4.0, credited in Settings › About). Only rebuild if the book format changes.
