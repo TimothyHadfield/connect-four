@@ -61,7 +61,7 @@ export function stacksSvg(v, left, total, h, seed) {
 /** One seat: stacks + plate. near = your edge of the table. */
 export function seatHTML({ v, left, total, name, sub, score, turn, near, h, seed }) {
   const stacks = `<span class="pile" aria-label="${left} discs left">${stacksSvg(v, left, total, h, seed)}</span>`;
-  const plate = `<span class="plate"><span class="nm">${esc(name)}<small>${esc(sub)}</small></span>${score != null ? `<span class="sc">${score}</span>` : ""}</span>`;
+  const plate = `<span class="plate"><span class="nm">${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ""}</span>${score != null ? `<span class="sc">${score}</span>` : ""}</span>`;
   return `<div class="pl ${near ? "near" : "far"} ${turn ? "turn" : ""}">${near ? stacks + plate : plate + stacks}</div>`;
 }
 

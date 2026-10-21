@@ -22,6 +22,8 @@ Checked 2026-10-20. Rule wording here is our own summary, not copied text.
 | 6 | Who goes first is chosen by the players (Hasbro: players decide; tournament practice alternates) | H, W | agree | "the 'first' option decides who drops first" (Settings: You / Computer / Take turns) |
 | 7 | Hasbro: first to win 5 games is champion | H | single source; shown as a running score per level, no forced match end | — (display only) |
 | 8 | No move after the game ends; no move out of turn | implied by H, W | — | "four across…" (throws "over"), "discs fall…" (throws "turn") |
+| 8a | The last disc that fills the board and makes four is a win, not a draw (rule 3 comes before rule 5) | H, W | agree | tests/edge.test.js "the 42nd disc fills the board AND makes four" |
+| 8b | Two players on one device: the loser starts the next game (after a draw, the other player starts). Our default within rule 6 | — (house default, said in the New game sheet) | — | tools/edge.mjs check 2 |
 
 ## Pop Out (Hasbro variant)
 

@@ -8,7 +8,7 @@ import { Analyst, BotClient, chipsFor, bestLine, popChips, colList } from "./ana
 import { LEVELS, LEVEL_NAMES, botMove, useFast, useBook } from "./ai.js";
 import { makeFast, fitsWasm } from "./fast.js";
 import { decodeBook } from "./book.js";
-import { S, save, $, $$, esc, toast, sheet, closeSheet, help, q, discIcon, ordinal, hooks } from "./ui.js";
+import { S, save, $, $$, esc, toast, sheet, closeSheet, help, q, discIcon, ordinal, hooks, today } from "./ui.js";
 import { HELP } from "./help.js";
 import { initStudy, showStudy, studyGame } from "./study.js";
 import { initTable, showTable } from "./table.js";
@@ -32,7 +32,11 @@ export function goTab(name, push = true) {
   if (name === "play") refreshAnalysis();
 }
 $$("nav.tabs button").forEach((b) => (b.onclick = () => goTab(b.dataset.tab)));
-window.addEventListener("popstate", () => goTab((location.hash || "#play").slice(1), false));
+window.addEventListener("popstate", () => {
+  // Back with a sheet open closes the sheet and stays on this screen
+  if ($("#overlay").classList.contains("show")) { closeSheet(); history.pushState({ tab: curTab }, "", "#" + curTab); return; }
+  goTab((location.hash || "#play").slice(1), false);
+});
 document.addEventListener("click", (e) => {
   const h = e.target.closest("[data-help]");
   if (h) { e.preventDefault(); e.stopPropagation(); const [t, b] = HELP[h.dataset.help] || ["Help", ""]; help(t, b); }
@@ -159,6 +163,7 @@ function replayTo(moves) {
   for (const m of moves) P.room.act(m.d ? { draw: true } : m.p ? { c: m.c, p: true } : { c: m.c }, m.s);
   P.silent = false;
   P.saved = false;
+  P.popMode = false;
   P.fxPrev = null;
   render(P.room.view(P.room.state.turn), { animate: false });
 }
@@ -186,12 +191,16 @@ function onColumn(c) {
   if (s.pub.result) { refuse(null); toast("Game over. Tap New game."); return; }
   if (P.resuming) { toast("Reconnecting to your room…"); return; }
   if (!isMyTurn()) { refuse(null); toast(P.mode === "computer" ? "Wait for the computer." : "Not your turn."); return; }
+  // two players on one phone: a double tap would also play the other player's disc
+  const now = performance.now();
+  if (P.mode === "friends" && now - (P.lastTap || 0) < 350) return;
+  P.lastTap = now;
   const wait = P.animUntil - 120 - performance.now();
   if (wait > 0) {
     // the last disc is still falling: play this tap as soon as it lands
     const gen = P.gen, moves = s.pub.moves.length;
     clearTimeout(P.queued);
-    P.queued = setTimeout(() => { if (gen === P.gen && P.snap && P.snap.pub.moves.length === moves) onColumn(c); }, wait + 10);
+    P.queued = setTimeout(() => { if (gen === P.gen && P.snap && P.snap.pub.moves.length === moves) { P.lastTap = 0; onColumn(c); } }, wait + 10);
     return;
   }
   const seat = s.pub.turn;
@@ -286,6 +295,7 @@ function renderPlayers(snap) {
     let sub = COLOR[i];
     if (P.mode === "computer") sub = i === P.comp ? LEVEL_NAMES[P.level] : COLOR[i];
     if (P.mode === "online") sub = seat.kind === "computer" ? "Computer" : seat.online ? (i === snap.mySeat ? "You" : "Online") : "Away";
+    if (sub === (seat.name || COLOR[i])) sub = ""; // two players are named Red / Yellow: say the colour once
     const turn = !pub.result && pub.turn === i;
     const near = i === nearSeat(snap);
     return seatHTML({ v: disc(i), left: discsLeft(pub.cells, disc(i), pub.W, pub.H), total: discsEach(pub.W, pub.H), name: seat.name || COLOR[i], sub,
@@ -462,11 +472,12 @@ function onFinished(snap) {
       if (sc) { sc.textContent = to - 1; setTimeout(() => { if (gen === P.gen) scoreBump(sc, to - 1, to, w === P.human ? "var(--good)" : "var(--bad)"); }, Math.max(0, P.animUntil - performance.now()) + 80); }
     }
   }
-  if (P.mode === "friends" && firstTime) S.nextStart = 1 - (pub.first || 0);
+  // two players: the loser starts the next game (after a draw, the other player starts)
+  if (P.mode === "friends" && firstTime) S.nextStart = w >= 0 ? 1 - w : 1 - (pub.first || 0);
   const id = P.mode === "online" ? Date.now() : P.gameId;
   S.history = S.history.filter((g) => g.id !== id);
   S.history.unshift({
-    id, date: new Date().toISOString().slice(0, 10), mode: P.mode, level: P.mode === "computer" ? P.level : null,
+    id, date: today(), mode: P.mode, level: P.mode === "computer" ? P.level : null,
     opts: { size: pub.size, popout: pub.popout, first: pub.first }, names: snap.seats.map((s) => s.name),
     you: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
     moves: pub.moves, winner: w, why: pub.result.why,
@@ -632,6 +643,9 @@ getOnline().resume().then((back) => {
   if (s.options) { const [W, H] = sizeOf(s.options); loadMainThreadSolver(W, H); }
   render(s);
 }).catch(() => { P.resuming = false; if (P.snap && P.snap.pub) render(P.snap, { animate: false }); });
+
+// laptop window dragged across the 900 px layout change: redraw the seats at the new size
+try { matchMedia("(min-width: 900px)").addEventListener("change", () => { if (P.snap && P.snap.pub && !$("#pstage").hidden) renderPlayers(P.snap); }); } catch (e) { /* old browser */ }
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {

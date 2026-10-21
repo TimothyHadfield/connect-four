@@ -128,7 +128,9 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
   .tabletop .pl { flex-direction: column-reverse; height: auto; gap: 4px; }
   .tabletop .pl.far { flex-direction: column; }
   .tabletop .pl .plate { max-width: 100%; height: 34px; }
-  .tabletop .pl .pile { height: auto; }
+  .tabletop .pl .pile { height: auto; max-width: 100%; }
+  /* big boards (5 stacks) shrink to fit the side instead of running off the table */
+  .tabletop .pl .stacks { max-width: 100%; height: auto; }
 }
 .tabletop .status { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .tabletop .verdict { color: rgba(243,239,228,.72); }
@@ -172,6 +174,11 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 .actions { flex: none; display: flex; gap: 6px; }
 .actions .btn { flex: 1; padding: 8px 6px; }
+/* Pop Out with a full board shows five buttons: on narrow phones they share the row (labels may wrap, icons go) */
+@media (max-width: 420px) {
+  .actions .btn { min-width: 0; white-space: normal; line-height: 1.1; text-align: center; }
+  .actions:has(#bDraw:not([hidden])) .btn svg { display: none; }
+}
 /* fixed height (two lines, or the Review button) so the board never moves when it changes */
 .verdict { flex: none; font-size: 13.5px; line-height: 19px; color: var(--muted); text-align: center; height: 38px; overflow: hidden; }
 .verdict b { color: var(--text); }
