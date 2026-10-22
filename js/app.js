@@ -85,7 +85,7 @@ root.innerHTML = `
       <button class="btn primary" id="bNew">New game</button>
     </div>
   </div>
-  <aside class="side" id="pside"></aside>
+  <aside class="side"><div class="ctrl" id="pctrl"></div><div class="side-body" id="pside"></div></aside>
 </div>`;
 
 FX.init({ game: "connect-four", accent: "#6ea8fe" });
@@ -644,8 +644,16 @@ getOnline().resume().then((back) => {
   render(s);
 }).catch(() => { P.resuming = false; if (P.snap && P.snap.pub) render(P.snap, { animate: false }); });
 
-// laptop window dragged across the 900 px layout change: redraw the seats at the new size
-try { matchMedia("(min-width: 900px)").addEventListener("change", () => { if (P.snap && P.snap.pub && !$("#pstage").hidden) renderPlayers(P.snap); }); } catch (e) { /* old browser */ }
+// Laptop: the board takes the whole table column; the status, verdict and buttons sit at the top
+// of the side column. Phone: they go back on the table / under it. Same elements, just moved.
+function placeControls(wide) {
+  const ctrl = $("#pctrl"), main = $("#ptable").parentElement;
+  if (wide) ctrl.append($("#pstatus"), $("#pverdict"), $("#pactions"));
+  else { $("#ptable").append($("#pstatus"), $("#pverdict")); main.append($("#pactions")); }
+}
+placeControls(matchMedia("(min-width: 900px)").matches);
+// laptop window dragged across the 900 px layout change: move the controls, redraw the seats at the new size
+try { matchMedia("(min-width: 900px)").addEventListener("change", (e) => { placeControls(e.matches); if (P.snap && P.snap.pub && !$("#pstage").hidden) renderPlayers(P.snap); }); } catch (e) { /* old browser */ }
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {
