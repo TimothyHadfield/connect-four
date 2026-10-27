@@ -358,7 +358,7 @@ function renderPlayers(snap) {
   $("#pl").innerHTML = [0, 1].map((i) => {
     const seat = snap.seats[i] || {};
     let sub = COLOR[i];
-    if (P.mode === "computer") sub = i === P.comp ? LEVEL_NAMES[P.level] : COLOR[i];
+    if (P.mode === "computer") sub = i === P.comp ? LEVEL_NAMES[P.level] : COLOR[i] + myElo();
     if (P.mode === "online") sub = seat.kind === "computer" ? "Computer" : seat.online ? (i === snap.mySeat ? "You" : "Online") : "Away";
     if (sub === (seat.name || COLOR[i])) sub = ""; // two players are named Red / Yellow: say the colour once
     const turn = !pub.result && pub.turn === i;
@@ -366,6 +366,11 @@ function renderPlayers(snap) {
     return seatHTML({ v: disc(i), left: discsLeft(pub.cells, disc(i), pub.W, pub.H), total: discsEach(pub.W, pub.H), name: seat.name || COLOR[i], sub,
       score: rec ? (i === P.human ? rec.w : rec.l) : null, turn, near, h: wide ? (near ? 60 : 44) : near ? 46 : 32, seed: "c4:" + i });
   }).join("");
+}
+
+/** " · Elo 1238" on your plate once you have a rated game (local Elo vs the computer levels, My stats). */
+function myElo() {
+  try { const e = Profile.stats().elo; return e && e.games > 0 ? ` · Elo ${e.rating}` : ""; } catch (e) { return ""; }
 }
 
 function matchScore() {
@@ -547,6 +552,9 @@ function onFinished(snap) {
     const you = P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1;
     const res = profileResult({ mode: P.mode, level: P.level, pub, you, daily: P.daily, helped: P.helped && !P.daily });
     elo = Profile.recordResult(P.daily ? { ...res, date: P.dailyDate } : res).elo;
+    // your plate shows the new Elo (just the caption: the score count-up keeps running)
+    const sm = P.mode === "computer" && $$("#pl .pl")[P.human] && $$("#pl .pl")[P.human].querySelector(".nm small");
+    if (sm) sm.textContent = COLOR[P.human] + myElo();
   }
   // two players: the loser starts the next game (after a draw, the other player starts)
   if (P.mode === "friends" && firstTime) S.nextStart = w >= 0 ? 1 - w : 1 - (pub.first || 0);

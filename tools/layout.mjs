@@ -48,7 +48,7 @@ if (ENGINE === "chrome") for (const k in SIZES) delete SIZES[k].isMobile;
 
 async function open(size, ls, tab) {
   const ctx = await b.newContext(SIZES[size]);
-  await ctx.addInitScript((v) => { try { if (!sessionStorage.getItem("_s")) { localStorage.setItem("c4:v1", v); sessionStorage.setItem("_s", "1"); } } catch (e) {} }, JSON.stringify(ls));
+  await ctx.addInitScript((v) => { try { if (!sessionStorage.getItem("_s")) { localStorage.setItem("c4:v1", v); localStorage.setItem("coach-offer:c4-first", "1"); sessionStorage.setItem("_s", "1"); } } catch (e) {} }, JSON.stringify(ls));
   const p = await ctx.newPage();
   p.errs = [];
   p.on("pageerror", (e) => p.errs.push(e.message));
