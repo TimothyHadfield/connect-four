@@ -43,5 +43,5 @@ export function renderSettings() {
   $("#sPop").onchange = (e) => { S.popout = e.target.checked; save(); settingsChanged("board"); };
   $("#sSolver").onchange = (e) => { S.showSolver = e.target.checked; save(); settingsChanged("solver"); };
   $("#sAnim").onchange = (e) => { S.anim = e.target.checked; save(); settingsChanged("anim"); };
-  $("#sName").onchange = (e) => { S.name = e.target.value.trim(); save(); };
+  $("#sName").onchange = (e) => { S.name = e.target.value.trim(); save(); if (globalThis.Profile && S.name) Profile.setName(S.name); };
 }

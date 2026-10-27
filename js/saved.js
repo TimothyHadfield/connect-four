@@ -49,6 +49,7 @@ export function cleanCurrent(c) {
     options: { size: s.size, popout: s.popout, first: s.first, level: LEVEL_KEYS.includes(c.options.level) ? c.options.level : "medium" },
     names: Array.isArray(c.names) ? [0, 1].map((i) => String(c.names[i] ?? "").slice(0, 40)) : null,
     moves: s.moves,
+    ...(typeof c.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.daily) ? { daily: c.daily } : {}),
   };
 }
 
