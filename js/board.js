@@ -265,9 +265,9 @@ export class Board {
       const x = PAD + c * CELL + CELL / 2;
       const g = el("g", { class: "chip " + (ch.cls || "") }, this.chips);
       el("rect", { x: x - 46, y: 8, width: 92, height: 78, rx: 18 }, g);
-      const t = el("text", { x, y: ch.sub ? 42 : 56, "text-anchor": "middle", class: "chip-t" }, g);
+      const t = el("text", { x, y: ch.sub ? 45 : 59, "text-anchor": "middle", class: "chip-t" }, g);
       t.textContent = ch.text;
-      if (ch.sub) { const s = el("text", { x, y: 74, "text-anchor": "middle", class: "chip-s" }, g); s.textContent = ch.sub; }
+      if (ch.sub) { const s = el("text", { x, y: 77, "text-anchor": "middle", class: "chip-s" }, g); s.textContent = ch.sub; }
     });
   }
 

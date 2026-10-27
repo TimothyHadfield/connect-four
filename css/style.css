@@ -117,16 +117,21 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .pl.far .nm { font-size: 12px; } .pl.far .nm small { font-size: 10px; } .pl.far .sc { font-size: 15px; } .pl.far .plate { padding: 0 8px; gap: 7px; }
 .pl .sc { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 800; }
 .pl.turn .plate { border-color: #f0c35a; box-shadow: 0 0 0 2px rgba(240,195,90,.45), 0 2px 4px rgba(0,0,0,.4); }
-/* phone on its side: the two seats sit left and right of the board so the board keeps its height */
+/* phone on its side: the board takes the table's full height in the middle; your seat with the
+   status and verdict sits on the left, the other player's seat on the right */
 @media (max-width: 899px) and (max-height: 500px) and (orientation: landscape) {
-  .tabletop { display: grid; grid-template-columns: minmax(96px, 1fr) minmax(0, 2.4fr) minmax(96px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; column-gap: 8px; }
-  .tabletop > * { grid-column: 1 / -1; }
-  .tabletop .pl.far { grid-column: 3; grid-row: 1; align-self: start; flex-direction: row-reverse; }
-  .tabletop .pl.near { grid-column: 1; grid-row: 1; align-self: end; }
-  .tabletop .stage, .tabletop #ponline { grid-column: 2; grid-row: 1; min-width: 0; }
-  .tabletop #ponline { grid-column: 1 / -1; }
+  .tabletop { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) minmax(120px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: ". board far" "st board far" "vd board far" "near board far"; column-gap: 8px; row-gap: 4px; padding: 6px; }
+  .tabletop .pl.far { grid-area: far; align-self: start; flex-direction: column; }
+  .tabletop .pl.near { grid-area: near; align-self: end; }
+  .tabletop .stage { grid-area: board; min-width: 0; }
+  .tabletop #ponline { grid-area: 1 / 1 / -1 / -1; }
+  .tabletop .status { grid-area: st; }
+  .tabletop .verdict { grid-area: vd; }
+  .tabletop .status { height: auto; min-height: 24px; flex-wrap: wrap; }
+  /* fixed room for four lines, so the seat under it never moves */
+  .tabletop .verdict { height: 76px; }
   .tabletop .pl { flex-direction: column-reverse; height: auto; gap: 4px; }
-  .tabletop .pl.far { flex-direction: column; }
   .tabletop .pl .plate { max-width: 100%; height: 34px; }
   .tabletop .pl .pile { height: auto; max-width: 100%; }
   /* big boards (5 stacks) shrink to fit the side instead of running off the table */
@@ -147,8 +152,8 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .board-svg.over .disc { opacity: .58; }
 .board-svg.over .win .disc { opacity: 1; }
 .chip rect { fill: var(--bg-soft); stroke: var(--line); stroke-width: 3; }
-.chip-t { font: 750 25px system-ui, -apple-system, sans-serif; fill: var(--text); letter-spacing: .01em; }
-.chip-s { font: 650 22px system-ui, -apple-system, sans-serif; fill: var(--muted); }
+.chip-t { font: 750 32px system-ui, -apple-system, sans-serif; fill: var(--text); letter-spacing: .01em; }
+.chip-s { font: 650 27px system-ui, -apple-system, sans-serif; fill: var(--muted); }
 .chip.w1 rect { fill: rgba(110,231,168,.22); stroke: #6ee7a8; } .chip.w1 .chip-t, .chip.w1 .chip-s { fill: #8af0bd; }
 .chip.w2 rect { fill: rgba(110,231,168,.12); stroke: #4fae7e; } .chip.w2 .chip-t, .chip.w2 .chip-s { fill: #7fd3a8; }
 .chip.d rect { fill: rgba(240,179,84,.12); stroke: #b98a45; } .chip.d .chip-t { fill: #f0c27a; }
@@ -221,7 +226,7 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
 .stepper { flex: none; display: flex; gap: 6px; align-items: center; }
 .stepper .btn { min-width: 44px; padding: 6px; }
 .stepper input[type=range] { flex: 1; min-width: 0; width: 0; accent-color: var(--accent); }
-.moves { flex: 0 0 auto; max-height: 15dvh; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
+.moves { flex: 0 0 auto; max-height: 12dvh; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
 .mv { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 3px 7px; font-size: 13px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .mv.cur { border-color: var(--accent); background: rgba(110,168,254,.12); }
 .mv i { width: 10px; height: 10px; border-radius: 50%; }
@@ -269,11 +274,39 @@ table.strength th:first-child, table.strength td:first-child { text-align: left;
   .pl .nm, .pl.far .nm { font-size: 15px; }
   .pl .nm small, .pl.far .nm small { font-size: 12px; }
   .pl .sc { font-size: 20px; }
+  /* Play: status, verdict and buttons at the top of the side column, so the board gets the table's full height */
+  .side .ctrl { flex: none; display: flex; flex-direction: column; gap: 6px; }
+  .side .ctrl:empty, .play-grid:has(#pstage[hidden]) .ctrl { display: none; }
+  .side .ctrl .verdict { height: 57px; }
+  .side .ctrl .actions { flex-wrap: wrap; }
+  .side .ctrl .actions .btn { flex: 1 1 28%; }
+  .side-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
 }
 @media (max-width: 899px) {
   .play-grid, .study-grid { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
   .play-main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
   .study-side { display: flex; flex-direction: column; gap: 6px; flex: none; }
+}
+/* portrait phone: the move list is one row that scrolls sideways, so the board gets the height */
+@media (max-width: 899px) and (orientation: portrait) {
+  #stMoves, #pzList { flex-wrap: nowrap; max-height: none; overflow-x: auto; overflow-y: hidden; padding-bottom: 0;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); scrollbar-width: none; }
+  #stMoves::-webkit-scrollbar, #pzList::-webkit-scrollbar { display: none; }
+  #stMoves .mv, #pzList .mv { flex: none; white-space: nowrap; min-height: 34px; }
+}
+/* phone on its side, Table and Study: board on the left at full height, its controls in a column on the right */
+@media (max-width: 899px) and (max-height: 500px) and (orientation: landscape) {
+  #tab-table .play-grid, .study-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .8fr); grid-template-rows: auto auto auto auto minmax(0, 1fr);
+    column-gap: 10px; row-gap: 6px; align-items: start; }
+  #tab-table .play-main, .study-grid > .play-main, .study-grid > .study-side { display: contents; }
+  #tab-table .play-main > *, .study-grid > .play-main > *, .study-grid > .study-side > * { grid-column: 2; }
+  #tab-table .stage, .study-grid .stage { grid-column: 1; grid-row: 1 / -1; align-self: stretch; }
+  #stMoves, #pzList { grid-row: 5; max-height: 100%; align-self: stretch; }
+  #tab-table .actions, .study-grid .actions { flex-wrap: wrap; }
+  #tab-table .actions .btn, .study-grid .actions .btn { flex: 1 1 40%; }
+  .study-grid .verdict { height: auto; min-height: 38px; max-height: 76px; }
+  /* Study's board is held by the height here, so its controls can have half the width (game picker, summary) */
+  .study-grid { grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr); }
 }
 
 /* ---------------------------------------------------------------- Sound & effects (fx.js rows, in this site's own look) */

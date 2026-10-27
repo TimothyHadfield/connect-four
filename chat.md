@@ -33,3 +33,9 @@
 - **Built:** `_table` kit re-copied (no flip cards in this game); fixes for 10 odd situations (progress.md "Odd situations"): app.js, ui.js, seats.js, style.css; tools/edge.mjs (24 browser checks), tests/edge.test.js (4).
 - **Verified:** tools/edge.mjs 10 FAIL on build 5 → 24/24 PASS on build 6 (local); stacks check seen failing with the CSS removed; npm test 49/49; regress.mjs 12/12; two-browsers on local and live PASS.
 - **Open:** see progress.md NOT verified (online AFK / host leave not driven).
+
+## 2026-10-21 → 10-27 — visibility pass (build 7)
+- **Asked:** Tim (all games): board/cards "too small to easily see what's going on … filling the screen with the board view and fitting the cards and other things in the empty space" (full quote in progress.md Standing instructions). Paused 10-21, resumed 10-27 ("continue working").
+- **Built:** laptop Play controls moved to the side column (app.js `placeControls`); landscape-phone grids for Play / Table / Study; chip text 25 → 32 units; portrait-phone move list and puzzle list one sideways-scrolling row; tools/layout.mjs (board share, hole size, chip px, overflow, current move visible, taps per column).
+- **Verified:** layout.mjs failed 11 on live build 6, all pass on build 7 in WebKit and Chrome (local); npm test 49/49; regress.mjs and edge.mjs all pass; 45 before / 45 after WebKit shots at 393, 320, 659×393, 1280, 1440 (0 errors, no overflow, no page scroll); one reviewer round, landscape Study widened after it.
+- **Open:** see progress.md NOT verified (visibility line).
