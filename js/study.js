@@ -174,7 +174,7 @@ function drawReview(animate = false) {
     const mine = R.tags.map((t, i) => (g.moves[i] && g.moves[i].s === seat ? t : null)).filter(Boolean);
     const c = (k) => mine.filter((t) => t.tag === k).length;
     const pts = mine.reduce((a, t) => a + (t.pts || 0), 0);
-    return `<span>${discIcon(seat === 0 ? 1 : 2, 14)} ${esc(g.names[seat])}: <b>${c("best")}</b> best · <b>${c("mistake")}</b> mistakes · <b>${c("blunder")}</b> blunders · <b>${pts}</b> pts lost</span>`;
+    return `<span>${discIcon(seat === 0 ? 1 : 2, 14)} ${esc(g.names[seat])}: <b>${c("best")}</b> best · <b>${c("mistake")}</b> ${c("mistake") === 1 ? "mistake" : "mistakes"} · <b>${c("blunder")}</b> ${c("blunder") === 1 ? "blunder" : "blunders"} · <b>${pts}</b> pts lost</span>`;
   });
   $("#stSummary").innerHTML = sum.join("") + q("points") + (R.running ? ` <span class="muted thinking">checking moves</span>` : "");
   $("#stMoves").innerHTML = g.moves.map((mv, i) => {

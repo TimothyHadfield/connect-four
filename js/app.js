@@ -812,6 +812,20 @@ if (window.PWA) window.PWA.safeToReload = () => {
   return !pub || !!pub.result || !pub.moves.length || curTab === "settings";
 };
 
+// Laptop keyboard: 1–9 drops a disc in that column on the Play tab (same path as a tap)
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !/^[1-9]$/.test(e.key) || curTab !== "play") return;
+  const a = document.activeElement;
+  if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
+  if ($("#overlay").classList.contains("show") || (window.Profile && Profile.isOpen && Profile.isOpen()) || (window.COACH && COACH.rulesOpen())) return;
+  const pub = P.snap && P.snap.pub;
+  if (!pub || $("#pstage").hidden) return;
+  const c = +e.key - 1;
+  if (c >= pub.W) return;
+  e.preventDefault();
+  onColumn(c);
+});
+
 // The computer's solver (.wasm) and opening book (.bin) are fetched inside a Web Worker, which the kit's
 // first-visit crawl doesn't see (its file list has no .wasm/.bin): ask the worker to keep them for offline play.
 try {

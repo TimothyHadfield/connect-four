@@ -24,17 +24,19 @@ export function steps(ctx) {
   const mine = () => { const p = pub(); return p ? p.moves.filter((m) => m.s === ctx.you).length : 0; };
   const myTurn = () => { const p = pub(); return !!p && !p.result && p.turn === ctx.you; };
   const over = () => { const p = pub(); return !!p && !!p.result; };
+  // true once you've dropped another disc since the step first showed (a player who plays on moves the tour on)
+  const playedOn = () => { let n = null; return () => { const m = mine(); if (n === null) n = m; return m > n; }; };
   const vis = (sel) => { const el = document.querySelector(sel); return el && el.getClientRects().length ? el : null; };
   // phone on its side: the board fills the height, so a note about the board points at the computer's seat
   // (right of the board) and stays narrow, instead of scrolling in the thin strip under the board
   const sideways = () => typeof matchMedia === "function" && matchMedia("(orientation: landscape) and (max-height: 500px)").matches;
   const board = () => (sideways() && vis("#pl .pl.far")) || "#pboard";
   const steps = [
-    { title: "Your first game", text: "You're Red against the Beginner computer. Get four in a line (across, up or diagonal) before Yellow does.", target: board },
+    { title: "Your first game", text: "You're Red against the Beginner computer. Get four in a line (across, up or diagonal) before Yellow does.", target: board, until: playedOn(), next: true },
     { title: "Drop a disc", text: "Tap a column: the disc falls to the lowest empty hole. The middle column is the strongest start.", target: board, when: myTurn, until: () => mine() > 0 },
-    { title: "Yellow's turn", text: "Yellow answered. Your discs come off your stacks at the near edge, as on a real table.", target: () => vis("#pl .pl.near") || "#pboard", when: () => mine() > 0 && myTurn(), next: true },
-    { title: "The chips", text: "The chips show what happens if you drop there and both sides then play perfectly. Turn them on in Settings.", target: board, when: myTurn, skipIf: over },
-    { title: "Hint and Undo", text: "Hint shows the best column; Undo takes back your turn. Chips, Hint or Undo make a game \"with help\": no Elo change.", target: () => vis("#bHint") || "#pactions", skipIf: over },
+    { title: "Yellow's turn", text: "Yellow answered. Your discs come off your stacks at the near edge, as on a real table.", target: () => vis("#pl .pl.near") || "#pboard", when: () => mine() > 0 && myTurn(), until: playedOn(), next: true },
+    { title: "The chips", text: "The chips show what happens if you drop there and both sides then play perfectly. Turn them on in Settings.", target: board, when: myTurn, until: playedOn(), next: true, skipIf: over },
+    { title: "Hint and Undo", text: "Hint shows the best column; Undo takes back your turn. Chips, Hint or Undo make a game \"with help\": no Elo change.", target: () => vis("#bHint") || "#pactions", until: playedOn(), next: true, skipIf: over },
     { title: "Play it out", text: "Block any three Yellow discs in a line, and play on until someone gets four.", target: board, until: over, skipIf: over },
     { title: "My stats", text: "Your results, Elo for each level, achievements and the Daily game. This guided game isn't counted.", target: "#bMe", when: over },
     { title: "Your next game", text: "Pick a level, who starts, or today's Daily game. The full rules are in Settings.", target: () => vis("#bNew") || "#pactions" },
