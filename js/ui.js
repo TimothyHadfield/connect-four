@@ -57,7 +57,7 @@ export function help(title, body) {
 }
 export const q = (key) => `<button class="q" data-help="${key}" aria-label="Why?">?</button>`;
 
-export const BUILD = "9";
+export const BUILD = "10";
 export function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 /** Hooks the page controller fills in (avoids importing app.js, which would load a second copy). */
 export const hooks = { settingsChanged: () => {}, openRules: () => {}, startGuided: () => {} };
