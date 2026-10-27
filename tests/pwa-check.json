@@ -1,0 +1,10 @@
+{
+  "repo": "connect-four",
+  "ready": "!!(window.__c4 && window.__c4.P.snap && window.__c4.P.snap.pub && document.querySelector('#pboard svg'))",
+  "play": [
+    "(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); const P = () => window.__c4.P; for (let i = 0; i < 100 && !(P().snap.pub.turn === 0 && !P().snap.pub.result && P().botGen === -1); i++) await w(100); window.__movesBefore = P().snap.pub.moves.length; const c = [3, 2, 4, 1, 5, 0, 6].find(c => !P().snap.pub.cells[c * P().snap.pub.H + P().snap.pub.H - 1]); document.querySelector(`#pboard .hit[data-col='${c}']`).dispatchEvent(new MouseEvent('click', { bubbles: true })); })()"
+  ],
+  "played": "(() => { const s = window.__c4.P.snap.pub; return s.moves.length >= window.__movesBefore + 2 && s.turn === 0 && window.__c4.P.botGen === -1; })()",
+  "safe": "document.querySelector('nav.tabs [data-tab=settings]').click()",
+  "debug": "JSON.stringify((() => { const P = window.__c4.P; const s = P.snap.pub; return { moves: s.moves.length, before: window.__movesBefore, turn: s.turn, botGen: P.botGen, gen: P.gen }; })())"
+}

@@ -51,6 +51,7 @@ export function cleanCurrent(c) {
     moves: s.moves,
     ...(typeof c.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.daily) ? { daily: c.daily } : {}),
     ...(c.helped === true ? { helped: true } : {}),
+    ...(c.guided === true ? { guided: true } : {}),
   };
 }
 

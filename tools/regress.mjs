@@ -187,6 +187,32 @@ for (const [name, ls] of [
     `chips=${chips} warn=${warn} ${JSON.stringify(st)} moves=${s.moves}`);
   await p.context().close();
 }
+// 14. (build 9) A new player is offered the guided first game: Beginner, chips on, and leaving it never counts.
+{
+  const p = await open();
+  const offered = await p.waitForSelector(".coach-offer", { timeout: 8000 }).then(() => true, () => false);
+  let info = { offered };
+  if (offered) {
+    await p.click(".coach-offer [data-o=yes]");
+    await p.waitForSelector(".coach-bubble", { timeout: 5000 });
+    await p.click("[data-coach=next]");
+    await p.waitForTimeout(400);
+    await p.click("#pboard .hit[data-col='3']");
+    await p.waitForFunction(() => window.__c4.P.snap.pub.moves.length >= 2 && /Your turn/.test(document.querySelector("#pstatus").textContent), null, { timeout: 20000 });
+    await p.waitForTimeout(1500);
+    info = { ...info, ...(await p.evaluate(() => ({ guided: window.__c4.P.guided, level: window.__c4.P.level, chips: document.querySelectorAll("#pboard g.chip").length,
+      bubble: (document.querySelector(".coach-bubble .coach-title") || {}).textContent || "" }))) };
+    await click(p, "#bNew");
+    await p.waitForTimeout(300);
+    info.warn = await p.evaluate(() => document.querySelector("#overlay .sheet").textContent.includes("count as a loss"));
+    await click(p, "#overlay [data-go]");
+    await p.waitForTimeout(800);
+    info = { ...info, ...(await p.evaluate(() => ({ games: Profile.stats().games, after: window.__c4.P.guided, tourHidden: !document.querySelector(".coach-layer") || document.querySelector(".coach-layer").classList.contains("coach-off") }))) };
+  }
+  check("guided first game offered, Beginner with chips, leaving it isn't counted", offered && info.guided && info.level === "beginner" && info.chips >= 6 && !info.warn && info.games === 0 && !info.after && info.tourHidden,
+    JSON.stringify(info));
+  await p.context().close();
+}
 await b.close();
 console.log(fails ? `${fails} FAILED` : "all passed");
 process.exit(fails ? 1 : 0);

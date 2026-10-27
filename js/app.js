@@ -16,8 +16,10 @@ import { renderSettings } from "./settings.js";
 import { seatHTML, discsLeft, discsEach, liftOff } from "./seats.js";
 import "./profile.js";
 import { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, quitResult, seedFromHistory } from "./profile-c4.js";
+import { rules as tutRules, steps as tutSteps } from "./tutorial.js";
 
 const COLOR = ["Red", "Yellow"];
+let tour = null; // the guided first game (js/tutorial.js + shared js/coach.js)
 const disc = (seat) => (seat === 0 ? 1 : 2);
 
 /* ------------------------------------------------------------------ tabs */
@@ -37,6 +39,7 @@ $$("nav.tabs button").forEach((b) => (b.onclick = () => goTab(b.dataset.tab)));
 window.addEventListener("popstate", () => {
   // Back with a sheet open closes the sheet and stays on this screen
   if ($("#overlay").classList.contains("show")) { closeSheet(); history.pushState({ tab: curTab }, "", "#" + curTab); return; }
+  if (window.COACH && COACH.rulesOpen()) { COACH.closeRules(); history.pushState({ tab: curTab }, "", "#" + curTab); return; }
   goTab((location.hash || "#play").slice(1), false);
 });
 document.addEventListener("click", (e) => {
@@ -165,6 +168,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   P.dailyDate = P.daily ? opts.dailyDate || today() : "";
   P.helped = !!opts.helped;   // solver chips, a hint or undo were used: counted, not rated
   P.guided = !!opts.guided && mode === "computer"; // the guided first game: never counted
+  if (!P.guided && tour) tour.stop();
   P.gameId = resume ? resume.id : Date.now();
   let first = 0;
   if (resume) first = resume.options.first;
@@ -201,7 +205,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
 function saveCurrent(pub) {
   if (P.mode === "online") return;
   const cur = pub && !pub.result && pub.moves.length
-    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves, ...(P.daily ? { daily: P.dailyDate } : {}), ...(P.helped ? { helped: true } : {}) }
+    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves, ...(P.daily ? { daily: P.dailyDate } : {}), ...(P.helped ? { helped: true } : {}), ...(P.guided ? { guided: true } : {}) }
     : null;
   if (JSON.stringify(cur) === JSON.stringify(S.current)) return;
   S.current = cur;
@@ -318,6 +322,7 @@ function render(snap, { animate = true } = {}) {
     refreshAnalysis();
   }
   renderSide();
+  if (P.guided && window.COACH) COACH.update();
   // the disc just played came off its player's stacks
   const m = pub.moves[pub.moves.length - 1];
   if (animate && S.anim && fxPrev && m && !m.p && !m.d && pub.moves.length === fxPrev.moves.length + 1) {
@@ -473,7 +478,7 @@ function refreshAnalysis(force = false) {
   const s = P.snap;
   if (!s || !s.pub || s.pub.result || curTab !== "play") return;
   if (!isMyTurn() || P.daily) { analyst.cancel(); return; }
-  if (!S.showSolver && !force && !P.hint) return;
+  if (!S.showSolver && !force && !P.hint && !P.guided) return;
   const pub = s.pub;
   const gen = P.gen, moves = pub.moves.length;
   analyst.analyze({ cells: pub.cells, W: pub.W, H: pub.H, toMove: disc(pub.turn), firstDisc: disc(pub.first), popout: pub.popout, depth: 5,
@@ -482,7 +487,7 @@ function refreshAnalysis(force = false) {
     if (m.error) return;
     if (m.pop) { P.pop = m.pop; }
     else P.cols = m.cols;
-    if (S.showSolver || P.hint) drawChips();
+    if (S.showSolver || P.hint || P.guided) drawChips();
     // a hint needs only win / draw / lose for every column, not the exact distances
     const ready = m.done || (!m.pop && m.cols && m.cols.every((x) => !x || (x.cat !== null && x.cat !== undefined)));
     if (P.hint && ready) { showHint(P.hintShown === moves); P.hintShown = moves; }
@@ -725,7 +730,7 @@ history.replaceState({ tab: startTab }, "", "#" + startTab);
 let hadRoom = false;
 try { hadRoom = !!JSON.parse(localStorage.getItem("online.connect-four") || "null"); } catch (e) {}
 P.resuming = hadRoom;
-if (S.current) newLocalGame(S.current.mode, { level: S.current.level, resume: S.current, helped: !!S.current.helped,
+if (S.current) newLocalGame(S.current.mode, { level: S.current.level, resume: S.current, helped: !!S.current.helped, guided: !!S.current.guided,
   daily: !!S.current.daily && !Profile.daily.played(S.current.daily), dailyDate: S.current.daily });
 else newLocalGame("computer");
 goTab(startTab, false);
@@ -740,6 +745,40 @@ getOnline().resume().then((back) => {
   render(s);
 }).catch(() => { P.resuming = false; if (P.snap && P.snap.pub) render(P.snap, { animate: false }); });
 
+/* ---------------------------------------------- rules + guided first game */
+function openRules() { if (window.COACH) { closeSheet(); COACH.rules(tutRules()); } }
+/** The guided first game: you (Red, first) against Beginner on 7 × 6, chips on, never counted. */
+function startGuided(confirmed = false) {
+  if (!window.COACH || !tour) return;
+  if (!confirmed && (dailyOn() || quitPending())) {
+    sheet(`<h3>Guided game</h3><p style="margin:0">${dailyOn() ? "Your Daily game" : "The game on the table"} will count as a loss.</p>
+      <div class="row end"><button class="btn" data-x>Cancel</button><button class="btn primary" data-go>Start</button></div>`, (el) => {
+      el.querySelector("[data-x]").onclick = closeSheet;
+      el.querySelector("[data-go]").onclick = () => { closeSheet(); startGuided(true); };
+    });
+    return;
+  }
+  if (P.mode === "online") { if (online) online.leave(); $("#ponline").hidden = true; $("#pstage").hidden = false; }
+  tour.reset();
+  newLocalGame("computer", { level: "beginner", starts: "you", guided: true, resume: {
+    id: Date.now(), options: { size: "7x6", popout: false, first: 0, level: "beginner" }, names: [S.name || "You", "Computer"], moves: [] } });
+  goTab("play");
+  tour.start();
+}
+if (window.COACH) {
+  tour = COACH.tour({
+    id: "c4-first",
+    steps: tutSteps({ pub: () => (P.guided && P.mode === "computer" && P.snap ? P.snap.pub : null), you: 0 }),
+    pauseIf: () => curTab !== "play" || !P.guided || P.mode !== "computer" || $("#overlay").classList.contains("show") || !!(window.Profile && Profile.isOpen && Profile.isOpen()),
+  });
+  if (P.guided && P.snap && P.snap.pub && !P.snap.pub.result) tour.resume(); // carry on after a reload
+  // offered once, to a new player only
+  else if (!S.current && !S.history.length && !Profile.stats().games && !tour.seen() && startTab === "play")
+    COACH.offer({ id: "c4-first", title: "New to Connect Four?", text: "A guided first game against the Beginner computer, one step at a time.", yes: "Teach me", no: "No thanks", onYes: () => startGuided() });
+}
+hooks.openRules = openRules;
+hooks.startGuided = () => startGuided();
+
 // Laptop: the board takes the whole table column; the status, verdict and buttons sit at the top
 // of the side column. Phone: they go back on the table / under it. Same elements, just moved.
 function placeControls(wide) {
@@ -750,6 +789,29 @@ function placeControls(wide) {
 placeControls(matchMedia("(min-width: 900px)").matches);
 // laptop window dragged across the 900 px layout change: move the controls, redraw the seats at the new size
 try { matchMedia("(min-width: 900px)").addEventListener("change", (e) => { placeControls(e.matches); if (P.snap && P.snap.pub && !$("#pstage").hidden) renderPlayers(P.snap); }); } catch (e) { /* old browser */ }
+
+// home-screen app (shared _pwa kit): a new version reloads itself only at a quiet moment — no room, no
+// sheet or panel open, not typing, the computer not thinking, and the game over / not started (or on Settings,
+// where the unfinished game is saved and comes back after the reload)
+if (window.PWA) window.PWA.safeToReload = () => {
+  if (P.mode === "online" || P.resuming || $("#overlay").classList.contains("show")) return false;
+  if (window.Profile && Profile.isOpen && Profile.isOpen()) return false;
+  if (window.COACH && (COACH.rulesOpen() || (tour && tour.current && tour.current() >= 0 && P.guided))) return false;
+  const a = document.activeElement;
+  if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return false;
+  if (P.botGen !== -1 || performance.now() < P.animUntil) return false;
+  const pub = P.snap && P.snap.pub;
+  return !pub || !!pub.result || !pub.moves.length || curTab === "settings";
+};
+
+// The computer's solver (.wasm) and opening book (.bin) are fetched inside a Web Worker, which the kit's
+// first-visit crawl doesn't see (its file list has no .wasm/.bin): ask the worker to keep them for offline play.
+try {
+  if (navigator.serviceWorker) navigator.serviceWorker.ready.then((r) => {
+    const urls = ["js/solver.wasm", "data/book7x6.bin", "data/puzzles.json"].map((u) => new URL(u, location.href).href);
+    if (r.active) r.active.postMessage({ type: "pwa:cache", urls });
+  }).catch(() => {});
+} catch (e) { /* no service worker */ }
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {
@@ -762,3 +824,4 @@ function settingsChanged(what) {
   if (what === "solver" && P.snap && P.snap.pub && !P.snap.pub.result) { if (!S.showSolver) { board.setChips(null); $("#pverdict").textContent = ""; analyst.cancel(); } else refreshAnalysis(); }
 }
 export { P };
+window.__c4 = { P }; // for headless checks (tools/pwa-check.mjs)

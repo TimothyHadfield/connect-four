@@ -60,7 +60,7 @@ export const q = (key) => `<button class="q" data-help="${key}" aria-label="Why?
 export const BUILD = "9";
 export function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 /** Hooks the page controller fills in (avoids importing app.js, which would load a second copy). */
-export const hooks = { settingsChanged: () => {} };
+export const hooks = { settingsChanged: () => {}, openRules: () => {}, startGuided: () => {} };
 
 export const discIcon =(v, size = 18) => {
   const [a, b] = v === 1 ? ["#ff7b72", "#d0313a"] : ["#ffe27a", "#f0b429"];

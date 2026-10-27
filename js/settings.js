@@ -30,7 +30,8 @@ export function renderSettings() {
     <div class="panel"><h2>Rules</h2><div class="muted" style="font-size:14px;display:flex;flex-direction:column;gap:6px">
       <p style="margin:0">Take turns dropping a disc into any column that isn't full. It falls to the lowest empty spot.</p>
       <p style="margin:0">Four of your colour in a line (across, up and down, or diagonal) wins. A full board with no four is a draw.</p>
-      <p style="margin:0"><b>Pop Out:</b> instead of dropping, you may pop one of your own discs out of the bottom row. A pop that makes four for both colours wins for the popper.</p></div></div>
+      <p style="margin:0"><b>Pop Out:</b> instead of dropping, you may pop one of your own discs out of the bottom row. A pop that makes four for both colours wins for the popper.</p></div>
+      ${window.COACH ? `<div class="row" style="margin-top:10px"><button class="btn grow" id="sRules">Full rules</button><button class="btn grow" id="sGuided">Guided game</button></div>` : ""}</div>
     <div class="panel"><h2>About</h2><div class="muted" style="font-size:13px;display:flex;flex-direction:column;gap:6px">
       <p style="margin:0">Opening results on the classic board come from John Tromp's 8-ply Connect-4 database (UCI Machine Learning Repository, CC BY 4.0). The solver follows the method Pascal Pons describes at blog.gamesolver.org. Board and disc art drawn for this site.</p>
       <p style="margin:0">Connect Four is a Hasbro trademark; this is a free fan-made study tool. Build ${BUILD}.</p></div></div>
@@ -43,5 +44,7 @@ export function renderSettings() {
   $("#sPop").onchange = (e) => { S.popout = e.target.checked; save(); settingsChanged("board"); };
   $("#sSolver").onchange = (e) => { S.showSolver = e.target.checked; save(); settingsChanged("solver"); };
   $("#sAnim").onchange = (e) => { S.anim = e.target.checked; save(); settingsChanged("anim"); };
+  if ($("#sRules")) $("#sRules").onclick = () => hooks.openRules();
+  if ($("#sGuided")) $("#sGuided").onclick = () => hooks.startGuided();
   $("#sName").onchange = (e) => { S.name = e.target.value.trim(); save(); if (globalThis.Profile && S.name) Profile.setName(S.name); };
 }
