@@ -39,3 +39,9 @@
 - **Built:** laptop Play controls moved to the side column (app.js `placeControls`); landscape-phone grids for Play / Table / Study; chip text 25 → 32 units; portrait-phone move list and puzzle list one sideways-scrolling row; tools/layout.mjs (board share, hole size, chip px, overflow, current move visible, taps per column).
 - **Verified:** layout.mjs failed 11 on live build 6, all pass on build 7 in WebKit and Chrome (local); npm test 49/49; regress.mjs and edge.mjs all pass; 45 before / 45 after WebKit shots at 393, 320, 659×393, 1280, 1440 (0 errors, no overflow, no page scroll); one reviewer round, landscape Study widened after it.
 - **Open:** see progress.md NOT verified (visibility line).
+
+## 2026-10-27 — My stats + Daily game (build 8)
+- **Asked:** improvement wave (common brief): pilot the new shared `_profile` kit (repo game-profile) end to end — "My stats" button, results vs every level, 5–8 achievements, a Daily game if it fits.
+- **Built:** kit copies js/profile.js + css/profile.css (1.0.1), js/profile-c4.js (level Elo from strength-data, 8 achievements, 4-disc daily opening, result mapping, one-time history import); app.js avatar button + Daily (New game › Daily, vs Strong, no help, leave = loss, resumes after reload); games with chips/hint/undo counted "with help", unrated; Elo change next to Review; fixed online results never being recorded (P.saved never reset online) and a reload double-count guard.
+- **Verified:** tests/profile.test.js 7 (seen failing first); npm test 56/56; layout/edge/regress all pass; button + panel sizes script at 320/393/659×393/1280/1440 in WebKit and Chrome (no overlap, no page scroll, 0 errors); browser runs of chips-on win (unrated) and chips-off win (Elo 1238, "Elo +38"), Daily resume/leave/finish. One reviewer round, 6 findings fixed.
+- **Open:** progress.md NOT verified (My stats line); Tim's calls in Decisions.
