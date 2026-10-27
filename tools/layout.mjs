@@ -54,7 +54,8 @@ async function open(size, ls, tab) {
   p.on("pageerror", (e) => p.errs.push(e.message));
   p.on("console", (m) => { if (m.type() === "error") p.errs.push(m.text()); });
   await p.goto(URL);
-  await p.waitForSelector("#pboard svg", { timeout: 20000 });
+  // a local python server sometimes refuses one connection under load: reload once
+  if (!(await p.waitForSelector("#pboard svg", { timeout: 15000 }).catch(() => null))) { p.errs.length = 0; await p.reload(); await p.waitForSelector("#pboard svg", { timeout: 20000 }); }
   if (tab) await p.click(`nav.tabs button[data-tab=${tab}]`);
   await p.waitForTimeout(900);
   return p;
@@ -72,7 +73,22 @@ const measure = (p) => p.evaluate(() => {
 });
 const f1 = (x) => Math.round(x * 10) / 10;
 
-const late7 = quietGame("7x6", 36), late9 = quietGame("9x7", 50);
+// a finished game (saved history keeps only games that ended) of at least n moves
+function finishedGame(n) {
+  for (;;) {
+    const moves = quietGame("7x6", n);
+    let s = game.setup(2, { size: "7x6", popout: false, first: 0 });
+    for (const m of moves) game.apply(s, m.s, { c: m.c });
+    while (!s.result) {
+      const legal = [];
+      for (let c = 0; c < s.W; c++) if (!s.cells[c * s.H + s.H - 1]) legal.push(c);
+      const c = legal[Math.floor(rnd() * legal.length)];
+      moves.push({ s: s.turn, c }); game.apply(s, s.turn, { c });
+    }
+    if (s.result.winner >= 0) return moves;
+  }
+}
+const late7 = quietGame("7x6", 36), late9 = quietGame("9x7", 50), study30 = finishedGame(28);
 // minimum sizes per screen (before this pass: landscape Play hole 19 px, Table 15, Study 3.5; laptop Play share 0.26)
 const want = {
   phone: { hole: 33, share: 0.45 },
@@ -86,14 +102,23 @@ for (const size of Object.keys(SIZES)) {
     ["Play 7x6 late", { ...base, current: cur("computer", "7x6", late7) }, null, 1],
     ["Play 9x7 late", { ...base, size: "9x7", current: cur("computer", "9x7", late9) }, null, 0.8],
     ["Table", { ...base }, "table", 1],
-    ["Study", { ...base, history: [{ id: 2, date: "2026-10-20", mode: "friends", opts: { size: "7x6", popout: false, first: 0 }, names: ["Red", "Yellow"], you: -1, moves: [0, 1, 0, 1, 0, 1, 0].map((c, i) => ({ s: i % 2, c })) }] }, "study", size === "small" ? 0.48 : size === "phone" ? 0.7 : 0.9], // 320 px Study: picker, stepper and summary leave ~190 px (known small)
+    // a real-length game (30 moves: the move list is long); before the one-row move list, 393 px Study gave hole 26.5 px, share 27%
+    ["Study", { ...base, history: [{ id: 2, date: "2026-10-20", mode: "friends", opts: { size: "7x6", popout: false, first: 0 }, names: ["Red", "Yellow"], you: -1, moves: study30 }] }, "study", size === "small" ? 0.6 : size === "phone" ? 0.85 : 0.9],
   ]) {
     const p = await open(size, ls, tab);
     await p.waitForTimeout(tab ? 300 : 0);
+    if (!tab) await p.waitForSelector("#pboard .chip-t", { timeout: 10000 }).catch(() => {}); // the solver's chips can take a moment
     const m = await measure(p);
     const w = want[size];
     check(`${size} ${name}: board fills the screen`, m.hole >= w.hole * scale && m.share >= w.share * scale, `hole ${f1(m.hole)} px (want ${f1(w.hole * scale)}), share ${f1(m.share * 100)}% (want ${f1(w.share * scale * 100)}%)`);
     check(`${size} ${name}: no overflow, nothing off screen, no errors`, !m.over && !m.off.length && !p.errs.length, `${m.off.join(",")} ${p.errs.join(" | ")}`);
+    if (tab === "study") {
+      // the move you are on is in view inside the move list (it may scroll sideways on a phone)
+      await p.click("#stMoves .mv:nth-child(12)");
+      await p.waitForTimeout(300);
+      const vis = await p.evaluate(() => { const l = document.querySelector("#stMoves").getBoundingClientRect(), c = document.querySelector("#stMoves .mv.cur").getBoundingClientRect(); return c.left >= l.left - 1 && c.right <= l.right + 1 && c.top >= l.top - 1 && c.bottom <= l.bottom + 1; });
+      check(`${size} ${name}: current move visible in the move list`, vis);
+    }
     if (!tab && m.chipN) check(`${size} ${name}: chip words fit their chips`, m.chipFit);
     if (!tab && name.includes("7x6") && (size === "phone" || size === "laptop" || size === "big")) check(`${size} ${name}: chip text ≥ 13 px`, m.chipFontPx >= 13, `${f1(m.chipFontPx)} px`);
     await p.context().close();
