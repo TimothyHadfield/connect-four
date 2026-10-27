@@ -50,6 +50,7 @@ export function cleanCurrent(c) {
     names: Array.isArray(c.names) ? [0, 1].map((i) => String(c.names[i] ?? "").slice(0, 40)) : null,
     moves: s.moves,
     ...(typeof c.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.daily) ? { daily: c.daily } : {}),
+    ...(c.helped === true ? { helped: true } : {}),
   };
 }
 

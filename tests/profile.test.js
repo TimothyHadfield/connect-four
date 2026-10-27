@@ -51,18 +51,30 @@ test("a loss and a 2-player game don't unlock wins; 2-player games count as play
   assert.equal(s.losses, 1); assert.equal(s.wins, 0); assert.equal(s.byMode.friends.g, 1);
 });
 
-test("daily opening: same for everyone today, legal, two discs, changes from day to day", () => {
+test("daily opening: same for everyone today, legal, four discs, rarely repeats", () => {
   fresh();
   const a = dailyOpening(Profile.daily.rng("2026-10-27"));
   const b = dailyOpening(Profile.daily.rng("2026-10-27"));
   assert.deepEqual(a, b);
-  assert.equal(a.length, 2);
-  assert.deepEqual(a.map((m) => m.s), [0, 1]);
-  const s = replay({ size: "7x6", popout: false, first: 0 }, a);
-  assert.ok(!s.result);
-  const week = new Set();
-  for (let d = 1; d <= 14; d++) week.add(JSON.stringify(dailyOpening(Profile.daily.rng(`2026-11-${String(d).padStart(2, "0")}`))));
-  assert.ok(week.size >= 8, "openings vary: " + week.size);
+  assert.equal(a.length, 4);
+  assert.deepEqual(a.map((m) => m.s), [0, 1, 0, 1]);
+  const year = new Set();
+  for (let d = 0; d < 365; d++) {
+    const day = new Date(2027, 0, 1 + d), key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    const o = dailyOpening(Profile.daily.rng(key));
+    assert.ok(!replay({ size: "7x6", popout: false, first: 0 }, o).result);
+    year.add(JSON.stringify(o));
+  }
+  assert.ok(year.size >= 320, "different openings in a year: " + year.size);
+});
+
+test("a game with help (solver chips, hint or undo) counts but is not rated and unlocks no level award", () => {
+  fresh();
+  const r = Profile.recordResult(profileResult({ mode: "computer", level: "perfect", pub: quickWin, you: 0, helped: true }));
+  assert.equal(r.elo, null);
+  assert.ok(!r.unlocked.some((a) => a.id === "perfect"));
+  assert.equal(Profile.stats().wins, 1);
+  assert.equal(Profile.stats().byMode.help.w, 1);
 });
 
 test("older games from the history are brought in once, oldest first, quietly", () => {

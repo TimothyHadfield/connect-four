@@ -26,19 +26,21 @@ export const C4_ACHIEVEMENTS = [
   { id: "daily", title: "Daily habit", desc: "3-day Daily streak", test: (c) => c.daily.streak >= 3 },
 ];
 
-/** Today's opening for the Daily game: one Red and one Yellow disc, from the day's seeded rng. */
+/** Today's opening for the Daily game: two Red and two Yellow discs (2,401 possible), from the day's
+ *  seeded rng. Two discs a side can never make four, so the game is always still open. */
 export function dailyOpening(rng) {
-  const a = Math.floor(rng() * 7) % 7, b = Math.floor(rng() * 7) % 7;
-  return [{ c: a, s: 0 }, { c: b, s: 1 }];
+  return [0, 1, 0, 1].map((s) => ({ c: Math.floor(rng() * 7) % 7, s }));
 }
 
-/** A finished game -> Profile.recordResult input. you = your seat (-1: two players on one device). */
-export function profileResult({ mode, level, pub, you, daily = false }) {
+/** A finished game -> Profile.recordResult input. you = your seat (-1: two players on one device).
+ *  helped: the solver's chips, a hint or undo were used -> counted under "With help", not rated. */
+export function profileResult({ mode, level, pub, you, daily = false, helped = false }) {
   const w = pub.result ? pub.result.winner : -1;
   const discs = you >= 0 ? pub.moves.filter((m) => m.s === you && !m.d && !m.p).length : 0;
   const extra = { discs, size: pub.size, popout: !!pub.popout };
   if (mode === "friends" || you < 0) return { mode, won: null, extra };
-  return { mode, level: mode === "computer" ? level : null, won: w >= 0 ? w === you : false, draw: w < 0, daily, extra };
+  const m = mode === "computer" && helped ? "help" : mode;
+  return { mode: m, level: m === "computer" ? level : null, won: w >= 0 ? w === you : false, draw: w < 0, daily, extra };
 }
 
 /** First time the profile is used: bring in the games already in Study's history (newest first there). */
