@@ -1,7 +1,7 @@
 # progress — Connect Four
 
 ## START HERE
-Read this, then CLAUDE.md (commands, traps), then docs/rules-check.md and docs/ideas.md. Last updated 2026-10-27 (build 7, visibility pass, live).
+Read this, then CLAUDE.md (commands, traps), then docs/rules-check.md and docs/ideas.md. Last updated 2026-10-27 (build 8, My stats + Daily game, live).
 
 ## Goal right now
 A Connect Four site in the board-games family: play the computer at measured levels, study games with a perfect solver, check a real table's board, and play friends online. Built as part of Tim's "add risk, clue, battleship, connect four, … to the list of games" wave. Live: https://timothyhadfield.github.io/connect-four/ (repo TimothyHadfield/connect-four).
@@ -16,13 +16,14 @@ A Connect Four site in the board-games family: play the computer at measured lev
 | Study | Review (tags Best…Blunder, points lost, threats), 27 puzzles, Lab (opening map, Tromp size table, cell power, strength table). |
 | Table tab | Copy a real board; verdict per column. |
 | Online | Shared `../_online/online.js` (security fix of 2026-10-20 included, commit 0b193d8 of _online), gameId "connect-four". Two-browser test passes on LIVE site 2026-10-20. |
-| Tests | `npm test` 49/49 (about 40 s; tests/edge.test.js added in build 6). Odd-situation browser checks: `node tools/edge.mjs [url] [shotDir]` (24 checks). Every test seen failing on a mutated engine. Browser checks: `node tools/regress.mjs [url]` (12 checks from the QA pass; all 11 bug checks failed on build 1, all pass on build 2). |
+| Tests | `npm test` 56/56 since build 8 (was 49/49 in build 6; about 40 s). Odd-situation browser checks: `node tools/edge.mjs [url] [shotDir]` (24 checks). Every test seen failing on a mutated engine. Browser checks: `node tools/regress.mjs [url]` (12 checks from the QA pass; all 11 bug checks failed on build 1, all pass on build 2). |
 | Done gate | Tests, live smoke (phone + desktop, 0 errors, 0 failed requests, no overflow), live two-browser online, QA pass + fixes (build 2): 2026-10-20. |
 | Design pass (build 3) | 2026-10-20: board art (shaded holes, light lip, disc highlight, feet + shadow), win dims the other discs, hover tint only on the frame, status/verdict fixed heights (board never moves at game end, measured 0 px), bigger laptop status/players, Study side panels on laptop, review picker ellipsis, 40px "?" tap area, online card at the top, size-table glyphs bigger. Before/after shots in the manager's scratchpad `design/connect-four/`. |
 | Real-table look (build 5) | 2026-10-20: Play tab is a wooden table (shared `_table` kit: css/table.css + js/game-table.js, byte-for-byte copies; the kit's table.js is renamed game-table.js because js/table.js is this site's Table tab). Board drawn like the real grid: see-through holes, drop slot on each column, ridges, side legs on flared feet, slider bar with pull tab (slides out on New game / Clear). Each player's own discs lie in stacks of 7 at their seat (js/seats.js): yours at the near edge, the opponent's across the table; stacks shrink as discs are played (a disc lifts off), refill on a pop. Phone landscape puts the seats left/right of the board. Research: manager scratchpad `table/connect-four/real.md`, before/after shots there. |
 | Sound & effects (build 4) | 2026-10-20: js/fx.js (shared _fx 1.0.3 since build 5, never edit here) + js/sfx.js (event → sound map, custom sounds). Settings › "Sound & effects". Tests: tests/fx.test.js (15). Map below. |
 | Edge pass (build 6) | 2026-10-20: 45 odd situations tested, 10 failed, all fixed. See "Odd situations" below. |
 | Visibility pass (build 7) | 2026-10-21: laptop Play puts status, verdict and buttons at the top of the side column (app.js `placeControls`, moved back under 900 px) so the board gets the table's full height (1280: holes 51 → 65 px, board 26% → 41% of the screen). Phone on its side: board in the middle at full table height, your seat + status + verdict on the left, opponent's seat on the right (holes 19 → 26 px); Table and Study on their side put the board left and the controls in a right column (Table holes 15 → 33 px, Study 3.5 → 29 px). Chip text 25 → 32 units (393 px phone: 11.4 → 14.6 px). Portrait phone Study: move list and puzzle list are one row that scrolls sideways (current move scrolled into view), 25-move review holes 26.5 → 31 px; Study on its side gives the controls half the width. Check: `node tools/layout.mjs [url] [webkit\|chrome]` (both pass; build 6 failed 11). Audit + before/after shots: manager scratchpad `vis/connect-four/`. Shipped 2026-10-27. |
+| My stats (build 8) | 2026-10-27, pilot of the shared `_profile` kit (game-profile 1.0.1, repo TimothyHadfield/game-profile): js/profile.js + css/profile.css are byte-for-byte copies (never edit here); Connect Four's part is js/profile-c4.js. Avatar button in the table's top-left corner ("My stats" label on laptop) opens the panel: name + picture, Elo, W/D/L per level, 8 achievements, Daily tab, export/import. Level Elo from strength-data (Beginner 800, Easy 1200, Medium 1500, Strong 1700, Perfect 2100). A game where the solver chips were shown, Hint or Undo was used counts under "Computer, with help" and is not rated (chips are on by default). Elo change shows after a rated game. Daily game (New game › Daily, or the panel): today's seeded 4-disc opening vs Strong on 7×6, no chips/hint/undo, once a day; leaving it unfinished counts as a loss; survives reload (keeps its start day past midnight). Older history brought in once on first load. Tests: tests/profile.test.js (7). |
 | Saved data (js/saved.js) | Every field of `c4:v1` checked on load; history and the unfinished game replayed through the rules, bad ones dropped. Unfinished local game restored on reload (`S.current`). Table keeps one board per size (`c4:table:WxH`). |
 
 ## Standing instructions
@@ -77,6 +78,8 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - FX.celebrate plays its fanfare through fx.js's own play(), so a spy on FX.play can't see it; tests/fx.test.js counts it from FX.stats.plays.
 - `S.nextStart` is shared by 2-player "loser starts" and the computer's "Take turns" (both flip it).
 - tools/two-browsers.mjs uses real Firebase and can time out once on a slow network (1 of 3 runs on 2026-10-20); rerun before suspecting code.
+- Shared copies js/profile.js + css/profile.css must `cmp` equal to `../_profile/profile.js` / `profile.css` (also `-text`). Profile storage keys: `profile:me`, `profile:connect-four`; finished online game key `c4:onlineDone` (stops a reload counting it twice).
+- `P.helped` is set by drawChips / Hint / Undo and saved with the unfinished game; `P.daily` + `P.dailyDate` likewise (saved.js cleanCurrent keeps `daily` and `helped`).
 - Exact win distances early in a game can take up to a minute; the Table tab caps the budget at 4e6 nodes, Review at 1.5e6.
 
 ## Decisions
@@ -86,6 +89,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - Solver chips shown by default on Play (switch in Settings).
 - Strength measured from random 2-disc openings played twice with colours swapped.
 - Table look (build 5, Tim's call to change): dark wood table; discs kept in stacks of 7; friends mode puts Red at the near edge; buttons and tab bar stay app-style, off the table; win rings/dimming and last-move dot kept.
+- My stats (build 8, Tim's call to change): button placement, achievement names, "with help" games unrated, Daily = 4-disc opening vs Strong with no help and leaving = loss.
 - Pop 10 and special editions not built (docs/rules-check.md "Not built").
 
 ## NOT verified
@@ -96,4 +100,5 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - Table look (build 5): the slider slide-out and disc lift-off seen only as running animations in headless WebKit, not by eye on a phone.
 - Online sounds (opponent's disc + your-turn chime from the snapshot) tested in node with the online seat logic, not in a live two-browser run.
 - Edge pass: online AFK / host leaving mid-game / Firestore offline-then-back not driven (shared online.js); page left 10 min in the background not run; Pop Out disc supply (more than 21 of one colour on the board) has no limit here, Hasbro sheet not re-read for it.
+- My stats (build 8): online result recording and the "not counted twice after reload" guard reasoned, not driven with two browsers; Daily past midnight reasoned (dates passed through, not clock-tested in a browser); export/import file picker not driven in WebKit (kit tests cover the data). Reviewer: phone button sits near the Computer's plate and may read as the computer's picture; Elo / Score not explained in the panel.
 - Visibility pass (build 7): sideways swipe of the one-row move list on a real phone not felt (WebKit taps only). Still small, left on purpose: 320 px Study holes 21.8 px, 320 px chip words 11.4 px (chip is one column wide), laptop Table/Study keep 87–169 px wood/blank either side (height-bound, holes 60–70 px). Study game picker still truncates "Red won · 25 moves" on phones (existing label).

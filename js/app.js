@@ -14,6 +14,8 @@ import { initStudy, showStudy, studyGame } from "./study.js";
 import { initTable, showTable } from "./table.js";
 import { renderSettings } from "./settings.js";
 import { seatHTML, discsLeft, discsEach, liftOff } from "./seats.js";
+import "./profile.js";
+import { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, seedFromHistory } from "./profile-c4.js";
 
 const COLOR = ["Red", "Yellow"];
 const disc = (seat) => (seat === 0 ? 1 : 2);
@@ -61,6 +63,7 @@ const P = {
   cols: null, pop: null, hint: false,
   animUntil: 0,
   saved: false,
+  daily: false,         // this game is today's Daily game (no hints, no undo, counts once a day)
   options: null,
   onlineView: "home",   // home | lobby | joining (when mode online and not playing)
 };
@@ -70,6 +73,7 @@ root.innerHTML = `
 <div class="play-grid">
   <div class="play-main">
     <div class="tabletop tbl-surface tbl-wood-dark" id="ptable">
+      <button type="button" class="pf-open c4-me" id="bMe" aria-label="My stats"></button>
       <div class="players" id="pl"></div>
       <div class="stage" id="pstage"><div class="board-host" id="pboard"></div></div>
       <div id="ponline" class="online-wrap" hidden></div>
@@ -92,6 +96,39 @@ FX.init({ game: "connect-four", accent: "#6ea8fe" });
 defineSounds();
 FX.onChange(() => settingsChanged("fx"));
 
+/* ------------------------------------------------- player profile (My stats) */
+Profile.init({
+  game: "connect-four", levels: C4_LEVELS, achievements: C4_ACHIEVEMENTS, name: S.name,
+  modes: { help: { name: "Computer, with help" }, friends: { name: "2 players" }, online: { name: "Online" } },
+  daily: { title: "Daily game", onPlay: () => startDaily() },
+  onChange: (what) => { if (what === "me" || what === "import") { if (Profile.name && Profile.name !== S.name) { S.name = Profile.name; save(); } paintMe(); } },
+});
+seedFromHistory(Profile, S.history);
+function paintMe() { $("#bMe").innerHTML = `${Profile.avatarSVG(Profile.avatar, 28)}<span>My stats</span>`; }
+paintMe();
+$("#bMe").onclick = () => Profile.openPanel();
+
+/** Today's Daily game: the day's opening (same for everyone) against Strong, 7 × 6, you are Red. */
+async function startDaily() {
+  if (dailyOn()) { goTab("play"); toast("Your Daily game is on the table"); return; }
+  if (Profile.daily.played()) { Profile.openPanel({ tab: "daily" }); return; }
+  if (P.mode === "online") { abandonDaily(); if (online) await online.leave(); $("#ponline").hidden = true; $("#pstage").hidden = false; }
+  const day = Profile.daily.date();
+  const moves = dailyOpening(Profile.daily.rng(day));
+  newLocalGame("computer", { level: "strong", daily: true, dailyDate: day, resume: {
+    id: Date.now(), options: { size: "7x6", popout: false, first: 0, level: "strong" }, names: [S.name || "You", "Computer"], moves } });
+  toast("Daily game: today's opening vs Strong");
+}
+/** A Daily game is on the table and not finished. */
+function dailyOn() { return P.daily && P.mode === "computer" && !!(P.snap && P.snap.pub && !P.snap.pub.result); }
+/** Leaving an unfinished Daily (new game, online, board size) counts it as lost, so it can't be retried. */
+function abandonDaily() {
+  if (!dailyOn()) return;
+  Profile.recordResult({ mode: "computer", level: "strong", won: false, daily: true, date: P.dailyDate });
+  P.daily = false;
+  toast("Daily game left: counted as a loss");
+}
+
 const board = new Board($("#pboard"), { onColumn: (c) => onColumn(c) });
 board.anim = boardAnim(S.anim);
 
@@ -100,12 +137,16 @@ function curOptions() {
 }
 
 export function newLocalGame(mode = P.mode, opts = {}) {
+  if (!opts.daily) abandonDaily();
   P.gen++;
   if (P.room && P.room.close && P.mode !== "online") P.room.close();
   const resume = opts.resume || null;
   P.mode = mode;
   P.level = opts.level || S.level;
   P.popMode = false; P.hint = false; P.cols = null; P.pop = null; P.saved = false;
+  P.daily = !!opts.daily && mode === "computer";
+  P.dailyDate = P.daily ? opts.dailyDate || today() : "";
+  P.helped = !!opts.helped;   // solver chips, a hint or undo were used: counted, not rated
   P.gameId = resume ? resume.id : Date.now();
   let first = 0;
   if (resume) first = resume.options.first;
@@ -142,7 +183,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
 function saveCurrent(pub) {
   if (P.mode === "online") return;
   const cur = pub && !pub.result && pub.moves.length
-    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves }
+    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves, ...(P.daily ? { daily: P.dailyDate } : {}), ...(P.helped ? { helped: true } : {}) }
     : null;
   if (JSON.stringify(cur) === JSON.stringify(S.current)) return;
   S.current = cur;
@@ -254,6 +295,7 @@ function render(snap, { animate = true } = {}) {
   if (P.mode !== "online") saveCurrent(pub);
   if (pub.result) onFinished(snap);
   else {
+    if (P.mode === "online") P.saved = false; // a new online game: its result gets saved when it ends
     maybeBot(snap, ms);
     refreshAnalysis();
   }
@@ -325,7 +367,7 @@ function renderStatus(snap) {
   }
   const t = pub.turn;
   if (P.resuming) el.innerHTML = `<span class="thinking">Reconnecting to your room</span>`;
-  else if (P.mode === "computer") el.innerHTML = t === P.human ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `<span class="thinking">Computer is thinking</span>`;
+  else if (P.mode === "computer") el.innerHTML = (t === P.human ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `<span class="thinking">Computer is thinking</span>`) + (P.daily ? " · Daily" : "");
   else if (P.mode === "online") el.innerHTML = snap.myTurn ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `${discIcon(disc(t))} <span class="thinking">${esc(snap.seats[t].name)} is playing</span>${snap.hostAway ? " · host offline" : ""}`;
   else el.innerHTML = `${discIcon(disc(t))} ${esc(snap.seats[t].name)}'s turn${P.popMode ? ": pick a disc to pop" : ""}`;
 }
@@ -333,9 +375,9 @@ function renderStatus(snap) {
 function renderActions(snap) {
   const pub = snap.pub;
   const online = P.mode === "online";
-  $("#bUndo").hidden = online;
+  $("#bUndo").hidden = online || P.daily;
   $("#bLeave").hidden = !online;
-  $("#bHint").hidden = false;
+  $("#bHint").hidden = P.daily;
   $("#bUndo").disabled = !pub.moves.length || (P.mode === "computer" && !pub.moves.some((m) => m.s === P.human));
   const canPop = pub.popout && !pub.result && isMyTurn() && popCols(pub).length > 0;
   $("#bPop").hidden = !pub.popout;
@@ -349,7 +391,7 @@ function renderActions(snap) {
 }
 
 $("#bHint").onclick = () => {
-  P.hint = true;
+  P.hint = true; P.helped = true;
   const known = P.pop || (P.cols && P.cols.every((x) => !x || (x.cat !== null && x.cat !== undefined)));
   if (!known) { P.hintShown = -1; if (!P.cols && !P.pop) refreshAnalysis(true); toast("Thinking…", 900); return; }
   showHint();
@@ -372,6 +414,7 @@ function showHint(quiet = false) {
 }
 $("#bUndo").onclick = () => {
   const pub = P.snap.pub;
+  P.helped = true;
   let moves = pub.moves.slice();
   if (P.mode === "computer") {
     // back to your previous turn
@@ -411,7 +454,7 @@ function maybeBot(snap, animMs) {
 function refreshAnalysis(force = false) {
   const s = P.snap;
   if (!s || !s.pub || s.pub.result || curTab !== "play") return;
-  if (!isMyTurn()) { analyst.cancel(); return; }
+  if (!isMyTurn() || P.daily) { analyst.cancel(); return; }
   if (!S.showSolver && !force && !P.hint) return;
   const pub = s.pub;
   const gen = P.gen, moves = pub.moves.length;
@@ -429,6 +472,7 @@ function refreshAnalysis(force = false) {
 }
 function drawChips() {
   const pub = P.snap.pub;
+  P.helped = true; // the solver's answers were on screen during this game
   if (P.pop) {
     const { chips, best } = popChips(P.pop, pub.W);
     board.setChips(chips);
@@ -472,20 +516,42 @@ function onFinished(snap) {
       if (sc) { sc.textContent = to - 1; setTimeout(() => { if (gen === P.gen) scoreBump(sc, to - 1, to, w === P.human ? "var(--good)" : "var(--bad)"); }, Math.max(0, P.animUntil - performance.now()) + 80); }
     }
   }
+  // an online game seen finished again after a reload is not counted a second time
+  const onlineSeen = P.mode === "online" && seenOnline(snap);
+  // the player profile (My stats): each game once
+  let elo = null;
+  if ((firstTime && P.mode !== "online") || (P.mode === "online" && !onlineSeen)) {
+    const you = P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1;
+    const res = profileResult({ mode: P.mode, level: P.level, pub, you, daily: P.daily, helped: P.helped && !P.daily });
+    elo = Profile.recordResult(P.daily ? { ...res, date: P.dailyDate } : res).elo;
+  }
   // two players: the loser starts the next game (after a draw, the other player starts)
   if (P.mode === "friends" && firstTime) S.nextStart = w >= 0 ? 1 - w : 1 - (pub.first || 0);
-  const id = P.mode === "online" ? Date.now() : P.gameId;
-  S.history = S.history.filter((g) => g.id !== id);
-  S.history.unshift({
-    id, date: today(), mode: P.mode, level: P.mode === "computer" ? P.level : null,
-    opts: { size: pub.size, popout: pub.popout, first: pub.first }, names: snap.seats.map((s) => s.name),
-    you: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
-    moves: pub.moves, winner: w, why: pub.result.why,
-  });
-  S.history = S.history.slice(0, 40);
-  save();
-  $("#pverdict").innerHTML = `<button class="btn small" id="bReview">Review this game</button>`;
+  if (!onlineSeen) {
+    const id = P.mode === "online" ? Date.now() : P.gameId;
+    S.history = S.history.filter((g) => g.id !== id);
+    S.history.unshift({
+      id, date: today(), mode: P.mode, level: P.mode === "computer" ? P.level : null,
+      opts: { size: pub.size, popout: pub.popout, first: pub.first }, names: snap.seats.map((s) => s.name),
+      you: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
+      moves: pub.moves, winner: w, why: pub.result.why,
+    });
+    S.history = S.history.slice(0, 40);
+    save();
+  }
+  const eloTxt = elo ? ` <span class="elo-ch" style="color:var(--${elo.change >= 0 ? "good" : "bad"})">Elo ${elo.change >= 0 ? "+" : "−"}${Math.abs(elo.change)}</span>` : "";
+  $("#pverdict").innerHTML = `<button class="btn small" id="bReview">Review this game</button>${eloTxt}`;
   $("#bReview").onclick = () => { studyGame(S.history[0]); goTab("study"); };
+}
+
+/** true if this finished online game (room code + moves) was already counted on this device. */
+function seenOnline(snap) {
+  const key = (snap.code || "") + "|" + snap.pub.moves.map((m) => (m.d ? "d" : (m.p ? "p" : "") + m.c)).join(",");
+  let last = null;
+  try { last = localStorage.getItem("c4:onlineDone"); } catch (e) { /* blocked */ }
+  if (last === key) return true;
+  try { localStorage.setItem("c4:onlineDone", key); } catch (e) { /* blocked */ }
+  return false;
 }
 
 /* --------------------------------------------------------- side panel */
@@ -497,7 +563,7 @@ function renderSide() {
   const list = pub.moves.map((m, i) => `<span class="mv">${discIcon(disc(m.s), 12)}${i + 1}. ${m.d ? "draw" : (m.p ? "pop " : "") + (m.c + 1)}</span>`).join("");
   el.innerHTML = `
     <div class="panel"><h2>Game</h2>
-      <div class="muted" style="font-size:13.5px">${esc(pub.size.replace("x", " × "))}${pub.popout ? " · Pop Out" : ""} · ${P.mode === "computer" ? "vs computer (" + LEVEL_NAMES[P.level] + ")" : P.mode === "friends" ? "2 players, one device" : "online"}</div>
+      <div class="muted" style="font-size:13.5px">${esc(pub.size.replace("x", " × "))}${pub.popout ? " · Pop Out" : ""} · ${P.mode === "computer" ? (P.daily ? "Daily game · " : "") + "vs computer (" + LEVEL_NAMES[P.level] + ")" : P.mode === "friends" ? "2 players, one device" : "online"}</div>
       ${rec ? `<div style="margin-top:6px;font-size:14px">Record: <b>${rec.w}</b> won · <b>${rec.d}</b> drawn · <b>${rec.l}</b> lost</div>` : ""}
     </div>
     <div class="panel"><h2>How to read the chips ${q("chips")}</h2>
@@ -507,13 +573,18 @@ function renderSide() {
 }
 
 /* ------------------------------------------------------------ new game */
+function dailyWord() {
+  if (dailyOn()) return "In progress";
+  const r = Profile.daily.result();
+  return r ? { w: "Won", l: "Lost", d: "Drawn", p: "Played" }[r.r] + " · next one tomorrow" : "Not played";
+}
 export function newGameSheet() {
   let mode = P.mode === "online" ? "computer" : P.mode, level = S.level, starts = S.starts;
   const draw = (el) => {
     el.innerHTML = `
       <h3>New game</h3>
       <div class="field"><span class="label">Opponent</span>
-        <div class="seg" id="ngMode">${[["computer", "Computer"], ["friends", "Friend"], ["online", "Online"]].map(([k, t]) => `<button data-k="${k}" class="${mode === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+        <div class="seg" id="ngMode">${[["computer", "Computer"], ["friends", "Friend"], ["online", "Online"], ["daily", "Daily"]].map(([k, t]) => `<button data-k="${k}" class="${mode === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
       ${mode === "computer" ? `
       <div class="field"><span class="label">Level ${q("levels")}</span>
         <div class="seg" id="ngLevel">${LEVELS.map((k) => `<button data-k="${k}" class="${level === k ? "on" : ""}" style="font-size:12.5px">${LEVEL_NAMES[k]}</button>`).join("")}</div></div>
@@ -521,8 +592,11 @@ export function newGameSheet() {
         <div class="seg" id="ngStart">${[["you", "You"], ["computer", "Computer"], ["alternate", "Take turns"]].map(([k, t]) => `<button data-k="${k}" class="${starts === k ? "on" : ""}">${t}</button>`).join("")}</div></div>` : ""}
       ${mode === "friends" ? `<p>Pass the phone. Red and Yellow take turns; the loser of each game starts the next.</p>` : ""}
       ${mode === "online" ? `<p>Make a room and send the code, or join a friend's room.</p>` : ""}
-      <div class="muted" style="font-size:13.5px">Board: <b style="color:var(--text)">${S.size.replace("x", " × ")}${S.popout ? " · Pop Out" : ""}</b> · change it in Settings</div>
-      <div class="row end"><button class="btn" data-x>Cancel</button><button class="btn primary" data-go>${mode === "online" ? "Continue" : "Start"}</button></div>`;
+      ${mode === "daily" ? `<p>Today's opening against Strong, the same for everyone. No hints or undo.</p>
+      <div class="muted" style="font-size:13.5px">Today: <b style="color:var(--text)">${dailyWord()}</b> · streak <b style="color:var(--text)">${Profile.daily.streak().cur}</b></div>`
+      : `<div class="muted" style="font-size:13.5px">Board: <b style="color:var(--text)">${S.size.replace("x", " × ")}${S.popout ? " · Pop Out" : ""}</b> · change it in Settings</div>
+      ${dailyOn() ? `<div style="font-size:13.5px;color:var(--warm)">Your Daily game will count as a loss.</div>` : ""}`}
+      <div class="row end"><button class="btn" data-x>Cancel</button><button class="btn primary" data-go ${mode === "daily" && Profile.daily.played() && !dailyOn() ? "disabled" : ""}>${mode === "online" ? "Continue" : mode === "daily" && dailyOn() ? "Back to it" : "Start"}</button></div>`;
     el.querySelectorAll("#ngMode button").forEach((b) => (b.onclick = () => { mode = b.dataset.k; draw(el); }));
     el.querySelectorAll("#ngLevel button").forEach((b) => (b.onclick = () => { level = b.dataset.k; draw(el); }));
     el.querySelectorAll("#ngStart button").forEach((b) => (b.onclick = () => { starts = b.dataset.k; draw(el); }));
@@ -530,6 +604,7 @@ export function newGameSheet() {
     el.querySelector("[data-go]").onclick = () => {
       closeSheet();
       if (mode === "online") { openOnline(); return; }
+      if (mode === "daily") { startDaily(); return; }
       S.level = level; S.starts = starts; save();
       newLocalGame(mode, { level, starts });
     };
@@ -555,6 +630,7 @@ async function loadMainThreadSolver(W, H) {
   } catch (e) { /* computer falls back to look-ahead */ }
 }
 function openOnline() {
+  abandonDaily();
   P.gen++;
   if (P.room && P.mode !== "online" && P.room.close) P.room.close();
   P.mode = "online";
@@ -630,7 +706,8 @@ history.replaceState({ tab: startTab }, "", "#" + startTab);
 let hadRoom = false;
 try { hadRoom = !!JSON.parse(localStorage.getItem("online.connect-four") || "null"); } catch (e) {}
 P.resuming = hadRoom;
-if (S.current) newLocalGame(S.current.mode, { level: S.current.level, resume: S.current });
+if (S.current) newLocalGame(S.current.mode, { level: S.current.level, resume: S.current, helped: !!S.current.helped,
+  daily: !!S.current.daily && !Profile.daily.played(S.current.daily), dailyDate: S.current.daily });
 else newLocalGame("computer");
 goTab(startTab, false);
 getOnline().resume().then((back) => {

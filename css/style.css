@@ -137,6 +137,14 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
   /* big boards (5 stacks) shrink to fit the side instead of running off the table */
   .tabletop .pl .stacks { max-width: 100%; height: auto; }
 }
+/* My stats: your picture in the table's top-left corner, a name plate like the seats' (label on laptop) */
+.c4-me { position: absolute; top: 5px; left: 6px; z-index: 2; height: 36px; min-width: 36px; padding: 0 4px; gap: 8px; border-radius: 18px;
+  background: linear-gradient(#3b2a1a, #24180d); border: 1px solid #7a5a2e; color: #f6efdc; font: 700 13.5px/1 inherit;
+  box-shadow: inset 0 1px 0 rgba(255,220,150,.22), 0 2px 4px rgba(0,0,0,.4); }
+.c4-me:active { transform: scale(.95); }
+.c4-me .pf-av { width: 26px; height: 26px; }
+.c4-me span { display: none; }
+@media (min-width: 900px) { .c4-me { top: 10px; left: 12px; height: 40px; padding: 0 5px; border-radius: 20px; } .c4-me .pf-av { width: 28px; height: 28px; } .c4-me span { display: inline; padding-right: 7px; } }
 .tabletop .status { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .tabletop .verdict { color: rgba(243,239,228,.72); }
 .tabletop .verdict b { color: #fff; }
