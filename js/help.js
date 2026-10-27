@@ -28,7 +28,7 @@ export const HELP = {
   firstmove: ["Opening map", `<p>What each first move leads to if both sides then play perfectly. On the classic 7 × 6 board only the middle column wins for the player who starts; the two next to it draw.</p>`],
   sizes: ["Other boards", `<p>Results with perfect play for each board size, from John Tromp's results table. + = the first player wins, = = draw, − = the second player wins. Blank = nobody has solved it yet.</p>`],
   cellpower: ["Cell power", `<p>How many different four-in-a-rows pass through each spot. The middle spots are part of the most lines, which is why the centre column is so strong.</p>`],
-  solver: ["Show the solver while playing", `<p>Shows the chips above the columns on your turn. Turn it off to play blind; the Hint button still shows the best move when you ask.</p>`],
+  solver: ["Show the solver while playing", `<p>Shows the chips above the columns on your turn. Turn it off to play blind; the Hint button still shows the best move when you ask.</p><p>A game where the chips were shown, or Hint or Undo was used, counts in My stats under "with help" and doesn't change your Elo.</p>`],
   popout: ["Pop Out", `
     <p>On your turn, either drop a disc or <b>pop one of your own discs out of the bottom row</b>; the column slides down.</p>
     <p>If a pop makes four in a row for both colours, the player who popped wins. With a full board you can pop or call it a draw. The same position three times is a draw.</p>`],

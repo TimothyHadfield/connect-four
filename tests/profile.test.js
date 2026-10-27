@@ -7,8 +7,8 @@ const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
 await import("../js/profile.js");
 const Profile = globalThis.Profile;
-const { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, seedFromHistory } = await import("../js/profile-c4.js");
-const { replay } = await import("../js/game.js");
+const C4 = await import("../js/profile-c4.js");
+const { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, seedFromHistory } = C4;const { replay } = await import("../js/game.js");
 const { LEVELS } = await import("../js/ai.js");
 
 let clock = new Date(2026, 9, 27, 12);
@@ -75,6 +75,29 @@ test("a game with help (solver chips, hint or undo) counts but is not rated and 
   assert.ok(!r.unlocked.some((a) => a.id === "perfect"));
   assert.equal(Profile.stats().wins, 1);
   assert.equal(Profile.stats().byMode.help.w, 1);
+});
+
+test("leaving a game vs the computer after your first disc counts as a loss; before it, or a guided game, doesn't", () => {
+  const { quitResult } = C4;
+  assert.equal(typeof quitResult, "function", "profile-c4.js exports quitResult");
+  const open = replay({ size: "7x6", popout: false, first: 0 }, [{ c: 3, s: 0 }, { c: 2, s: 1 }]);
+  const compFirst = replay({ size: "7x6", popout: false, first: 1 }, [{ c: 3, s: 1 }]);
+  // you (Red) dropped a disc, then left: a rated loss at that level
+  const r = quitResult({ mode: "computer", level: "strong", pub: open, you: 0 });
+  assert.deepEqual({ mode: r.mode, level: r.level, won: r.won, draw: r.draw }, { mode: "computer", level: "strong", won: false, draw: false });
+  // with help: a loss under "with help"
+  assert.equal(quitResult({ mode: "computer", level: "strong", pub: open, you: 0, helped: true }).mode, "help");
+  // the computer moved first and you haven't played yet: nothing counts
+  assert.equal(quitResult({ mode: "computer", level: "strong", pub: compFirst, you: 0 }), null);
+  // guided first game, two players, finished games, Daily (has its own rule): nothing
+  assert.equal(quitResult({ mode: "computer", level: "easy", pub: open, you: 0, guided: true }), null);
+  assert.equal(quitResult({ mode: "friends", pub: open, you: -1 }), null);
+  assert.equal(quitResult({ mode: "computer", level: "easy", pub: quickWin, you: 0 }), null);
+  assert.equal(quitResult({ mode: "computer", level: "strong", pub: open, you: 0, daily: true }), null);
+  fresh();
+  Profile.recordResult(r);
+  assert.equal(Profile.stats().losses, 1);
+  assert.deepEqual(Profile.stats().byLevel.strong, { g: 1, w: 0, l: 1, d: 0 });
 });
 
 test("older games from the history are brought in once, oldest first, quietly", () => {

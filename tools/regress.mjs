@@ -53,6 +53,18 @@ const click = (p, sel) => p.evaluate((s) => document.querySelector(s).click(), s
   await click(p, "nav.tabs button[data-tab='play']");
   await p.waitForTimeout(6000);
   const s = await pub(p);
+  // build 9: you'd already played, so leaving would count as a loss: the game stays, the new size waits for the next game
+  check("size change mid-game keeps the game and the computer still answers", s.moves >= 3 && s.size === "7x6", `size=${s.size} moves=${s.moves}`);
+  await p.context().close();
+}
+// 1c. Board size changed while the computer thinks its first move (you haven't played): new board at once.
+{
+  const p = await open({ level: "strong", starts: "computer" });
+  await click(p, "nav.tabs button[data-tab='settings']");
+  await click(p, "#sSize button[data-k='6x5']");
+  await click(p, "nav.tabs button[data-tab='play']");
+  await p.waitForTimeout(6000);
+  const s = await pub(p);
   check("computer moves after size change mid-think", s.moves >= 1 && s.size === "6x5", `size=${s.size} moves=${s.moves}`);
   await p.context().close();
 }
@@ -154,6 +166,25 @@ for (const [name, ls] of [
   await p.waitForTimeout(1500);
   const m = (await pub(p)).moves;
   check("tap during the falling disc still counts", m >= 3, `disc still falling for ${r.falling} ms; moves now ${m}`);
+  await p.context().close();
+}
+// 13. (build 9) A fresh player's games count as rated (no solver chips), and leaving after your first disc is a loss.
+{
+  const p = await open();
+  await p.waitForFunction(() => /Your turn/.test(document.querySelector("#pstatus").textContent), null, { timeout: 15000 });
+  await p.waitForTimeout(1500);
+  const chips = await p.evaluate(() => document.querySelectorAll("#pboard g.chip").length);
+  await p.click("#pboard .hit[data-col='3']");
+  await p.waitForFunction(() => /Your turn/.test(document.querySelector("#pstatus").textContent), null, { timeout: 20000 });
+  await click(p, "#bNew");
+  await p.waitForTimeout(300);
+  const warn = await p.evaluate(() => document.querySelector("#overlay .sheet").textContent.includes("will count as a loss"));
+  await click(p, "#overlay [data-go]");
+  await p.waitForTimeout(800);
+  const st = await p.evaluate(() => ({ losses: Profile.stats().losses, rated: (Profile.stats().byLevel.medium || {}).l || 0, help: (Profile.stats().byMode.help || {}).g || 0 }));
+  const s = await pub(p);
+  check("fresh player: no chips; leaving after a disc warns and counts a rated loss", chips === 0 && warn && st.losses === 1 && st.rated === 1 && st.help === 0 && s.moves === 0,
+    `chips=${chips} warn=${warn} ${JSON.stringify(st)} moves=${s.moves}`);
   await p.context().close();
 }
 await b.close();

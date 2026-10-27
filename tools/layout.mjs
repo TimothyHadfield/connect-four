@@ -35,7 +35,7 @@ function quietGame(size, n, popout = false) {
   }
 }
 const cur = (mode, size, moves, popout = false) => ({ mode, id: 1, level: "medium", options: { size, popout, first: 0, level: "medium" }, names: mode === "computer" ? ["You", "Computer"] : ["Red", "Yellow"], moves });
-const base = { level: "medium", starts: "you", showSolver: true, anim: false };
+const base = { level: "medium", starts: "you", showSolver: true, chipsV: 2, anim: false };
 
 const SIZES = {
   phone: { viewport: { width: 393, height: 659 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },

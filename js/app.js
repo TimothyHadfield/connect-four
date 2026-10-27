@@ -15,7 +15,7 @@ import { initTable, showTable } from "./table.js";
 import { renderSettings } from "./settings.js";
 import { seatHTML, discsLeft, discsEach, liftOff } from "./seats.js";
 import "./profile.js";
-import { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, seedFromHistory } from "./profile-c4.js";
+import { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, quitResult, seedFromHistory } from "./profile-c4.js";
 
 const COLOR = ["Red", "Yellow"];
 const disc = (seat) => (seat === 0 ? 1 : 2);
@@ -113,6 +113,7 @@ async function startDaily() {
   if (dailyOn()) { goTab("play"); toast("Your Daily game is on the table"); return; }
   if (Profile.daily.played()) { Profile.openPanel({ tab: "daily" }); return; }
   if (P.mode === "online") { abandonDaily(); if (online) await online.leave(); $("#ponline").hidden = true; $("#pstage").hidden = false; }
+  abandonDaily(); // a game vs the computer you'd started counts as a loss
   const day = Profile.daily.date();
   const moves = dailyOpening(Profile.daily.rng(day));
   newLocalGame("computer", { level: "strong", daily: true, dailyDate: day, resume: {
@@ -121,12 +122,28 @@ async function startDaily() {
 }
 /** A Daily game is on the table and not finished. */
 function dailyOn() { return P.daily && P.mode === "computer" && !!(P.snap && P.snap.pub && !P.snap.pub.result); }
-/** Leaving an unfinished Daily (new game, online, board size) counts it as lost, so it can't be retried. */
+/** Leaving an unfinished Daily (new game, online, board size) counts it as lost, so it can't be retried.
+ *  Any other game vs the computer left after your first disc counts as a loss too (not a guided game). */
 function abandonDaily() {
-  if (!dailyOn()) return;
-  Profile.recordResult({ mode: "computer", level: "strong", won: false, daily: true, date: P.dailyDate });
-  P.daily = false;
-  toast("Daily game left: counted as a loss");
+  if (dailyOn()) {
+    Profile.recordResult({ mode: "computer", level: "strong", won: false, daily: true, date: P.dailyDate });
+    P.daily = false;
+    toast("Daily game left: counted as a loss");
+    return;
+  }
+  const res = quitPending();
+  if (!res) return;
+  P.counted = P.gameId;
+  Profile.recordResult(res);
+  const k = P.level + ":" + P.snap.pub.size + (P.snap.pub.popout ? ":pop" : "");
+  const r = S.record[k] || { w: 0, d: 0, l: 0 };
+  r.l++; S.record[k] = r; save();
+  toast("Game left: counted as a loss");
+}
+/** The loss that leaving the game on the table now would record (null: leaving is free). */
+function quitPending() {
+  if (P.mode !== "computer" || P.daily || P.counted === P.gameId || !P.snap || !P.snap.pub) return null;
+  return quitResult({ mode: "computer", level: P.level, pub: P.snap.pub, you: P.human, helped: P.helped, guided: P.guided });
 }
 
 const board = new Board($("#pboard"), { onColumn: (c) => onColumn(c) });
@@ -147,6 +164,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   P.daily = !!opts.daily && mode === "computer";
   P.dailyDate = P.daily ? opts.dailyDate || today() : "";
   P.helped = !!opts.helped;   // solver chips, a hint or undo were used: counted, not rated
+  P.guided = !!opts.guided && mode === "computer"; // the guided first game: never counted
   P.gameId = resume ? resume.id : Date.now();
   let first = 0;
   if (resume) first = resume.options.first;
@@ -503,7 +521,7 @@ function onFinished(snap) {
   const w = pub.result.winner;
   const firstTime = P.counted !== P.gameId;
   P.counted = P.gameId;
-  if (P.mode === "computer" && firstTime) {
+  if (P.mode === "computer" && firstTime && !P.guided) {
     const k = P.level + ":" + pub.size + (pub.popout ? ":pop" : "");
     const r = S.record[k] || { w: 0, d: 0, l: 0 };
     if (w < 0) r.d++; else if (w === P.human) r.w++; else r.l++;
@@ -520,7 +538,7 @@ function onFinished(snap) {
   const onlineSeen = P.mode === "online" && seenOnline(snap);
   // the player profile (My stats): each game once
   let elo = null;
-  if ((firstTime && P.mode !== "online") || (P.mode === "online" && !onlineSeen)) {
+  if ((firstTime && P.mode !== "online" && !P.guided) || (P.mode === "online" && !onlineSeen)) {
     const you = P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1;
     const res = profileResult({ mode: P.mode, level: P.level, pub, you, daily: P.daily, helped: P.helped && !P.daily });
     elo = Profile.recordResult(P.daily ? { ...res, date: P.dailyDate } : res).elo;
@@ -593,9 +611,10 @@ export function newGameSheet() {
       ${mode === "friends" ? `<p>Pass the phone. Red and Yellow take turns; the loser of each game starts the next.</p>` : ""}
       ${mode === "online" ? `<p>Make a room and send the code, or join a friend's room.</p>` : ""}
       ${mode === "daily" ? `<p>Today's opening against Strong, the same for everyone. No hints or undo.</p>
-      <div class="muted" style="font-size:13.5px">Today: <b style="color:var(--text)">${dailyWord()}</b> · streak <b style="color:var(--text)">${Profile.daily.streak().cur}</b></div>`
+      <div class="muted" style="font-size:13.5px">Today: <b style="color:var(--text)">${dailyWord()}</b> · streak <b style="color:var(--text)">${Profile.daily.streak().cur}</b></div>
+      ${!dailyOn() && !Profile.daily.played() && quitPending() ? `<div style="font-size:13.5px;color:var(--warm)">The game on the table will count as a loss.</div>` : ""}`
       : `<div class="muted" style="font-size:13.5px">Board: <b style="color:var(--text)">${S.size.replace("x", " × ")}${S.popout ? " · Pop Out" : ""}</b> · change it in Settings</div>
-      ${dailyOn() ? `<div style="font-size:13.5px;color:var(--warm)">Your Daily game will count as a loss.</div>` : ""}`}
+      ${dailyOn() ? `<div style="font-size:13.5px;color:var(--warm)">Your Daily game will count as a loss.</div>` : quitPending() ? `<div style="font-size:13.5px;color:var(--warm)">The game on the table will count as a loss.</div>` : ""}`}
       <div class="row end"><button class="btn" data-x>Cancel</button><button class="btn primary" data-go ${mode === "daily" && Profile.daily.played() && !dailyOn() ? "disabled" : ""}>${mode === "online" ? "Continue" : mode === "daily" && dailyOn() ? "Back to it" : "Start"}</button></div>`;
     el.querySelectorAll("#ngMode button").forEach((b) => (b.onclick = () => { mode = b.dataset.k; draw(el); }));
     el.querySelectorAll("#ngLevel button").forEach((b) => (b.onclick = () => { level = b.dataset.k; draw(el); }));
@@ -735,7 +754,11 @@ try { matchMedia("(min-width: 900px)").addEventListener("change", (e) => { place
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {
   board.anim = boardAnim(S.anim);
-  if (what === "board" && P.mode !== "online") newLocalGame(P.mode === "friends" ? "friends" : "computer");
+  if (what === "board" && P.mode !== "online") {
+    // a game that would count as a loss (or today's Daily) stays on the table; the new board comes with the next game
+    if (dailyOn() || quitPending()) toast("The new board starts with your next game");
+    else newLocalGame(P.mode === "friends" ? "friends" : "computer");
+  }
   if (what === "solver" && P.snap && P.snap.pub && !P.snap.pub.result) { if (!S.showSolver) { board.setChips(null); $("#pverdict").textContent = ""; analyst.cancel(); } else refreshAnalysis(); }
 }
 export { P };

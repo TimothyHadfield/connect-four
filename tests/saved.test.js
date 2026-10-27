@@ -34,6 +34,16 @@ test("good settings survive unchanged", () => {
   assert.deepEqual(s.puzzle.solved, ["c1-1200002"]);
 });
 
+test("solver chips are off by default (so games count as rated); an old saved 'on' is switched off once, a later choice sticks", () => {
+  assert.equal(cleanSettings(null).showSolver, false);
+  // a player from before build 9: showSolver true was the old default, saved with everything else
+  const old = cleanSettings({ size: "7x6", showSolver: true, anim: true });
+  assert.equal(old.showSolver, false);
+  // they switch the chips back on: it stays on through the next load
+  const again = cleanSettings(JSON.parse(JSON.stringify({ ...old, showSolver: true })));
+  assert.equal(again.showSolver, true);
+});
+
 test("history entries with illegal moves are dropped, good ones kept", () => {
   const bad = [
     { ...goodEntry, moves: [{ s: 0, c: 99 }] },                        // no such column

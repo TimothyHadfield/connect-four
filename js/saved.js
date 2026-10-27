@@ -6,8 +6,8 @@ import { replay, SIZES } from "./game.js";
 export const LEVEL_KEYS = ["beginner", "easy", "medium", "strong", "perfect"];
 
 export const DEFAULTS = {
-  size: "7x6", popout: false, level: "medium", starts: "you", showSolver: true, anim: true, threats: false,
-  name: "", nextStart: 0, record: {}, history: [], puzzle: { solved: [] }, current: null,
+  size: "7x6", popout: false, level: "medium", starts: "you", showSolver: false, anim: true, threats: false,
+  name: "", nextStart: 0, record: {}, history: [], puzzle: { solved: [] }, current: null, chipsV: 2,
 };
 
 const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
@@ -65,7 +65,10 @@ export function cleanSettings(raw) {
     popout: pick("popout", bool),
     level: pick("level", (v) => LEVEL_KEYS.includes(v)),
     starts: pick("starts", (v) => ["you", "computer", "alternate"].includes(v)),
-    showSolver: pick("showSolver", bool),
+    // build 9: chips off by default so games vs the computer count as rated. Settings saved before
+    // (chipsV missing) had the old "on" default stored: switched off once; a later choice sticks.
+    showSolver: raw.chipsV === 2 ? pick("showSolver", bool) : false,
+    chipsV: 2,
     anim: pick("anim", bool),
     threats: pick("threats", bool),
     name: typeof raw.name === "string" ? raw.name.slice(0, 20) : "",

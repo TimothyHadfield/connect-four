@@ -43,6 +43,16 @@ export function profileResult({ mode, level, pub, you, daily = false, helped = f
   return { mode: m, level: m === "computer" ? level : null, won: w >= 0 ? w === you : false, draw: w < 0, daily, extra };
 }
 
+/** Leaving an unfinished game vs the computer (new game, online, board change) after your first disc:
+ *  a loss. Before your first disc, a guided game, two players or the Daily (own rule): null. */
+export function quitResult({ mode, level, pub, you, helped = false, guided = false, daily = false }) {
+  if (mode !== "computer" || guided || daily || you < 0 || !pub || pub.result) return null;
+  const discs = pub.moves.filter((m) => m.s === you && !m.d).length;
+  if (!discs) return null;
+  const m = helped ? "help" : "computer";
+  return { mode: m, level: m === "computer" ? level : null, won: false, draw: false, quit: true, extra: { discs, size: pub.size, popout: !!pub.popout } };
+}
+
 /** First time the profile is used: bring in the games already in Study's history (newest first there). */
 export function seedFromHistory(Profile, history) {
   if (!Array.isArray(history) || !history.length || Profile.stats().games > 0) return 0;
