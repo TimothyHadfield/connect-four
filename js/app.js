@@ -2,7 +2,7 @@
 import "./fx.js";
 import { defineSounds, react, refuse, release, scoreBump, boardAnim } from "./sfx.js";
 import { game, SIZES, setBot, sizeOf } from "./game.js";
-import { createLocal, createOnline } from "./online.js";
+import { createLocal, createOnline } from "./online.js?v=a3d0418b";
 import { Board } from "./board.js";
 import { Analyst, BotClient, chipsFor, bestLine, popChips, colList } from "./analysis.js";
 import { LEVELS, LEVEL_NAMES, botMove, useFast, useBook } from "./ai.js";
