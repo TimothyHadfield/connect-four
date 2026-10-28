@@ -826,14 +826,8 @@ document.addEventListener("keydown", (e) => {
   onColumn(c);
 });
 
-// The computer's solver (.wasm) and opening book (.bin) are fetched inside a Web Worker, which the kit's
-// first-visit crawl doesn't see (its file list has no .wasm/.bin): ask the worker to keep them for offline play.
-try {
-  if (navigator.serviceWorker) navigator.serviceWorker.ready.then((r) => {
-    const urls = ["js/solver.wasm", "data/book7x6.bin", "data/puzzles.json"].map((u) => new URL(u, location.href).href);
-    if (r.active) r.active.postMessage({ type: "pwa:cache", urls });
-  }).catch(() => {});
-} catch (e) { /* no service worker */ }
+// The solver (.wasm), opening book (.bin) and puzzles are fetched later by script: index.html lists them in
+// pwa.js's data-extra, so the game-pwa kit (1.3.0+) keeps them for offline play.
 
 hooks.settingsChanged = settingsChanged;
 function settingsChanged(what) {

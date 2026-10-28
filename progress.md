@@ -64,6 +64,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 | Undo, reload, resume, joining a room | silent (more than one move changed) | none |
 
 ## Traps
+- **Kits re-copied 2026-10-27 (kitfix, build 12):** game-coach 1.1.0 (rules tabs wrap; the guided-game note beside the tall board keeps title + 2 lines + buttons instead of a thin strip) and game-pwa 1.3.0. The app.js `pwa:cache` workaround is gone: index.html's pwa.js tag lists `data-extra="js/solver.wasm data/book7x6.bin data/puzzles.json"` (kit 1.3.0 also crawls quoted .wasm/.bin paths). pwa-check 18/18 after removing it. A new later-loaded file goes in that list.
 - **online.js cache stamp (2026-10-27):** every import of `js/online.js` uses `?v=a3d0418b`, the `_online` content stamp. After a re-copy: put the new stamp from `node ../_online/tools/stamp.mjs` there, bump the importing file's `?v=` (and pwa.js `data-version`), then `node ../_online/tools/stamp.mjs --check .` must say OK.
 - Never `import "./app.js"` from another module (index.html loads `app.js?v=N`, a second copy breaks the page). Shared bits are in ui.js.
 - Study stores Pop Out values under `popv` (`cols.pop` collides with Array.prototype.pop).
