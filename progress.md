@@ -9,6 +9,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 ## Status
 | Part | State |
 |---|---|
+| Wave-3 kit sweep (build 14, 2026-10-28) | Done. game-coach 1.2.0 (offer `place:"auto", avoid:["#bNew"]`) + game-pwa 1.4.0 copied; offer covers neither tab bar nor New game at 393×659/320×568/659×393; Settings no sideways scroll at 320; no `<select>`. |
 | Rules engine (js/game.js, rules.js) | Done. Sizes 7×6, 6×5, 8×7, 9×7, 5×4; Pop Out (own-pop, both-four goes to the popper, repetition draw at 3, full-board pop-or-draw). |
 | Solver | Done. Pons-style negamax in WebAssembly (js/solver.wasm from wasm/solver.ts) for boards with W·(H+1) ≤ 64, JS fallback (js/solver.js), opening book data/book7x6.bin (128,323 positions). |
 | Computer levels | Beginner / Easy / Medium / Strong / Perfect, measured 2026-10-20 over 3,700 games (js/strength-data.js, shown in Study › Lab). |

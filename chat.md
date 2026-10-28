@@ -58,3 +58,6 @@
 - **Built:** Five in a row (9 × 6, pre-filled outer columns) and Power discs (Anvil / Bomb / Wall) with computers (js/variants.js); Rules row in Settings + Board/Rules rows in New game; Five, Power and Videos tabs in the rules sheet; Hint = one column; Play again; touch ghost disc; Settings › Computer speed. Pop 10 skipped (setup phase + scoring cost more for less fun).
 - **Verified:** tests/variants.test.js 10/11 failed on build 12, 11/11 after; npm 69/69; regress/edge/layout/pwa-check (18/18) local; ladder in node (progress.md wave-3 row); scratch c4w3/w3.mjs ALL PASS on local and LIVE (4e5d125): power sheet/Wall/Bomb/playout/Play again, Five at 320/393/659×393/1280/1440 with no page scroll and 0 errors, New game sheet, Hint 7 → 1 chips (live before/after), ghost, 4 video links; YouTube links checked by oembed (200 + title).
 - **Open:** progress.md NOT verified (wave-3 line); Tim's calls in Decisions.
+
+## 2026-10-28 — wave-3 kit sweep (build 14)
+- game-coach 1.2.0 + game-pwa 1.4.0 copied; first-visit offer `place:"auto"` avoiding New game. Verified: npm 69/69, pwa-check 18/18 (WebKit), offer rects clear of tab bar + New game at 393×659/320×568/659×393, Settings 320 no sideways scroll, 393 screenshot looked at.

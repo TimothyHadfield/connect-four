@@ -846,7 +846,7 @@ if (window.COACH) {
   if (P.guided && P.snap && P.snap.pub && !P.snap.pub.result) tour.resume(); // carry on after a reload
   // offered once, to a new player only
   else if (!S.current && !S.history.length && !Profile.stats().games && !tour.seen() && startTab === "play")
-    COACH.offer({ id: "c4-first", title: "New to Connect Four?", text: "A guided first game against the Beginner computer, one step at a time.", yes: "Teach me", no: "No thanks", onYes: () => startGuided() });
+    COACH.offer({ id: "c4-first", title: "New to Connect Four?", text: "A guided first game against the Beginner computer, one step at a time.", yes: "Teach me", no: "No thanks", onYes: () => startGuided(), place: "auto", avoid: ["#bNew"] });
 }
 hooks.openRules = openRules;
 hooks.startGuided = () => startGuided();
