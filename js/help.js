@@ -32,5 +32,16 @@ export const HELP = {
   popout: ["Pop Out", `
     <p>On your turn, either drop a disc or <b>pop one of your own discs out of the bottom row</b>; the column slides down.</p>
     <p>If a pop makes four in a row for both colours, the player who popped wins. With a full board you can pop or call it a draw. The same position three times is a draw.</p>`],
+  variants: ["Rules", `
+    <p><b>Classic</b>: four in a row wins.</p>
+    <p><b>Pop Out</b>: instead of dropping, you may pop one of your own discs out of the bottom row.</p>
+    <p><b>Five</b>: the boxed Five-in-a-Row version. A 9 × 6 frame whose two outer columns start full of alternating discs; you need <b>five</b> in a line. Still 21 discs each.</p>
+    <p><b>Power</b>: house rules after the Power Up edition. Each player gets one Anvil, one Bomb and one Wall disc to use once.</p>
+    <p>None of these is solved, so their chips and the computer use look-ahead, not the exact solver.</p>`],
+  power: ["Power discs", `
+    <p>Once per game each, instead of a normal disc:</p>
+    <p><b>Anvil</b>: your disc that knocks every disc below it out of the column and lands on the bottom.</p>
+    <p><b>Bomb</b>: pop one of the other player's discs out of the bottom row; the column slides down. If that makes a line for both colours, the bomber wins.</p>
+    <p><b>Wall</b>: a grey disc that counts for nobody. Good for blocking.</p>`],
   starts: ["Who starts", `<p>On the classic board the player who starts can always win with perfect play, so taking turns is the fair choice.</p>`],
 };

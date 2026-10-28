@@ -2,12 +2,13 @@
  * page never freezes. Module worker. Messages:
  *   {type:"init", W, H, bits}                      -> {type:"ready", fast, book}
  *   {type:"move", id, pub, seat, level}            -> {type:"move", id, move}
- *   {type:"analyze", id, cells, W, H, toMove, firstDisc, popout, depth}
+ *   {type:"analyze", id, cells, W, H, toMove, firstDisc, popout, five, power, pw, depth}
  *        -> {type:"analysis", id, cols, done}      (several, as columns resolve)
  */
 import { makeFast, fitsWasm } from "./fast.js";
 import { decodeBook } from "./book.js";
 import { useFast, useBook, analyzeColumns, botMove, popValues } from "./ai.js";
+import { varValues } from "./variants.js";
 
 let size = "";
 let wasmBytes = null;
@@ -48,6 +49,12 @@ async function handle(m) {
     self.postMessage({ type: "move", id: m.id, move });
   } else if (m.type === "analyze") {
     await init(m.W, m.H, m.bits);
+    if (m.five || m.power) {
+      // Five in a row / Power discs: look-ahead values, sent like Pop Out's ({c, w?, v} per move)
+      const vals = varValues(m.cells, m.W, m.H, m.five ? 5 : 4, m.toMove, m.power ? m.pw : null, m.five ? 6 : 4);
+      self.postMessage({ type: "analysis", id: m.id, pop: vals, done: true });
+      return;
+    }
     if (m.popout) {
       const vals = popValues(m.cells, m.W, m.H, m.toMove, m.depth || 5);
       self.postMessage({ type: "analysis", id: m.id, pop: vals, done: true });

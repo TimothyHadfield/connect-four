@@ -8,12 +8,14 @@
  *   medium   - looks 4 discs ahead
  *   easy     - looks 2 discs ahead, 1 move in 4 is random
  *   beginner - random, but takes a win it can see and usually blocks one
- * Pop Out uses its own search (depth 6 / 4 / 2 / random). */
+ * Pop Out uses its own search (depth 6 / 4 / 2 / random); Five in a row and
+ * Power discs use js/variants.js. */
 
 import { makeSolver, BIG } from "./solver.js";
 import { bookKey } from "./book.js";
 import { winsAt, hasLine, isFull } from "./rules.js";
 import { ABORTED } from "./fast.js";
+import { chooseVar } from "./variants.js";
 
 export const LEVELS = ["perfect", "strong", "medium", "easy", "beginner"];
 export const LEVEL_NAMES = { perfect: "Perfect", strong: "Strong", medium: "Medium", easy: "Easy", beginner: "Beginner" };
@@ -321,6 +323,7 @@ function strip(m) { return m.p ? { c: m.c, p: true } : { c: m.c }; }
 export function botMove(pub, seat, level, rng = Math.random) {
   const me = discOf(seat);
   const firstDisc = discOf(pub.first);
+  if (pub.five || pub.power || (pub.n || 4) !== 4) return chooseVar(pub, seat, level, rng);
   if (pub.popout) return choosePop(pub.cells, pub.W, pub.H, me, level, rng);
   return { c: chooseDrop(pub.cells, pub.W, pub.H, me, firstDisc, level, rng) };
 }

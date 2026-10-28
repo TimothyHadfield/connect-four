@@ -91,9 +91,10 @@ export const PWIN = 100000;
 export function popChips(vals, W) {
   const chips = new Array(W).fill(null);
   if (!vals || !vals.length) return { chips, best: null };
-  const best = vals.reduce((a, b) => (b.v > a.v ? b : a));
+  // equal values: a plain drop first (it keeps the power discs and pops for later)
+  const best = vals.reduce((a, b) => (b.v > a.v || (b.v === a.v && !b.w && !b.p && (a.w || a.p)) ? b : a));
   for (const x of vals) {
-    if (x.p) continue;
+    if (x.p || x.w) continue; // pops and power discs aren't drops: the verdict line names them
     chips[x.c] = popChip(x.v, x.v === best.v);
   }
   return { chips, best, bestPop: best.p ? best : null };

@@ -73,7 +73,7 @@ export function eventsFor(prev, pub) {
   const { W, H, cells } = pub;
   const out = [];
   if (m.d) out.push({ type: "drawCall", seat: m.s });
-  else if (m.p) {
+  else if (m.p || m.w === "b") {
     let above = 0;
     for (let r = 0; r < H; r++) if (cells[m.c * H + r]) above++;
     out.push({ type: "pop", seat: m.s, c: m.c, above });

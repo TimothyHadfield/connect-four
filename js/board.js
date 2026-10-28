@@ -18,7 +18,7 @@ function el(tag, attrs = {}, parent) {
 
 export function discSvg(v, size = 22) {
   const id = "dg" + ++uid;
-  const [a, b, ring] = v === 1 ? ["#ff7b72", "#d0313a", "#a82029"] : ["#ffe27a", "#f0b429", "#c98d0c"];
+  const [a, b, ring] = v === 1 ? ["#ff7b72", "#d0313a", "#a82029"] : v === 3 ? ["#c9ced6", "#7d8591", "#5d646e"] : ["#ffe27a", "#f0b429", "#c98d0c"];
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true"><defs><radialGradient id="${id}" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><circle cx="50" cy="50" r="47" fill="url(#${id})"/><circle cx="50" cy="50" r="31" fill="none" stroke="${ring}" stroke-width="5" opacity=".75"/><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/><ellipse cx="36" cy="30" rx="16" ry="9" fill="#fff" opacity=".32" transform="rotate(-28 36 30)"/></svg>`;
 }
 
@@ -45,11 +45,12 @@ export class Board {
       <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a74ea"/><stop offset="1" stop-color="#2052c4"/></linearGradient>
       <radialGradient id="${id}r" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ff7b72"/><stop offset="1" stop-color="#d0313a"/></radialGradient>
       <radialGradient id="${id}y" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f0b429"/></radialGradient>
+      <radialGradient id="${id}g" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#c9ced6"/><stop offset="1" stop-color="#7d8591"/></radialGradient>
       <radialGradient id="${id}h" cx="50%" cy="60%" r="60%"><stop offset="0" stop-color="#0a1230" stop-opacity=".22"/><stop offset=".72" stop-color="#081028" stop-opacity=".42"/><stop offset="1" stop-color="#050a1c" stop-opacity=".72"/></radialGradient>
       <linearGradient id="${id}t" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1b44a6"/><stop offset=".45" stop-color="#3a74ea"/><stop offset="1" stop-color="#1a409c"/></linearGradient>
       <linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a5fd6"/><stop offset=".5" stop-color="#1c46aa"/><stop offset="1" stop-color="#143583"/></linearGradient>
       <clipPath id="${id}c"><rect x="0" y="0" width="${vw}" height="${TOP + PAD + H * CELL}"/></clipPath>`;
-    this.gradR = `url(#${id}r)`; this.gradY = `url(#${id}y)`;
+    this.gradR = `url(#${id}r)`; this.gradY = `url(#${id}y)`; this.gradG = `url(#${id}g)`;
     // top row: chips / preview
     this.chips = el("g", { class: "chips" }, svg);
     // the grid is see-through, as the real one: the table behind shows through each hole,
@@ -112,7 +113,18 @@ export class Board {
       r.addEventListener("click", () => this.opts.onColumn && this.opts.onColumn(c));
       r.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && matchMedia("(hover: hover)").matches) { hl.setAttribute("x", PAD + c * CELL); hl.classList.add("on"); } });
       r.addEventListener("pointerleave", () => hl.classList.remove("on"));
+      // touch: while a finger is down, a ghost disc sits above the column it's on (opts.ghost() = disc value or 0)
+      r.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") this.ghostAt(c); });
     }
+    const off = () => this.preview(null);
+    svg.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "mouse" || !this.pv) return;
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      const col = t && t.closest && t.closest("[data-col]");
+      if (col) this.ghostAt(+col.dataset.col);
+    });
+    svg.addEventListener("pointerup", () => setTimeout(off, 120));
+    svg.addEventListener("pointercancel", off);
     this.discs = new Map(); // cell index -> element
   }
 
@@ -120,8 +132,9 @@ export class Board {
 
   makeDisc(v) {
     const g = el("g", { class: "disc" });
-    g.appendChild(el("circle", { r: 43, fill: v === 1 ? this.gradR : this.gradY }));
-    g.appendChild(el("circle", { r: 29, fill: "none", stroke: v === 1 ? "#a82029" : "#c98d0c", "stroke-width": 5, opacity: 0.7 }));
+    // v 3 = a Wall (Power discs): grey, belongs to nobody
+    g.appendChild(el("circle", { r: 43, fill: v === 1 ? this.gradR : v === 3 ? this.gradG : this.gradY }));
+    g.appendChild(el("circle", { r: 29, fill: "none", stroke: v === 1 ? "#a82029" : v === 3 ? "#5d646e" : "#c98d0c", "stroke-width": 5, opacity: 0.7 }));
     g.appendChild(el("circle", { r: 43, fill: "none", stroke: "rgba(0,0,0,.22)", "stroke-width": 2 }));
     g.appendChild(el("ellipse", { cx: -13, cy: -19, rx: 15, ry: 8, fill: "#fff", opacity: 0.32, transform: "rotate(-28 -13 -19)" }));
     return g;
@@ -271,9 +284,17 @@ export class Board {
     });
   }
 
-  /** Preview disc above a column (hover on laptop). */
+  ghostAt(c) {
+    const v = this.opts.ghost ? this.opts.ghost(c) : 0;
+    if (!v) { this.preview(null); return; }
+    if (this.pv && this.pvCol === c) return;
+    this.preview(c, v);
+    this.pvCol = c;
+  }
+
+  /** Preview disc above a column (touch ghost). */
   preview(c, v) {
-    if (this.pv) { this.pv.remove(); this.pv = null; }
+    if (this.pv) { this.pv.remove(); this.pv = null; this.pvCol = -1; }
     if (c == null || c < 0 || !v) return;
     const g = this.makeDisc(v);
     g.setAttribute("transform", `translate(${PAD + c * CELL + CELL / 2} ${TOP / 2})`);

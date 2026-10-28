@@ -1,6 +1,7 @@
 /* Board rules shared by the game engine, the computer players and the tools.
  * cells: array of W*H, column-major (index col*H + row, row 0 = bottom),
- * 0 = empty, 1 = first colour (red), 2 = second colour (yellow). */
+ * 0 = empty, 1 = first colour (red), 2 = second colour (yellow), 3 = a Wall
+ * (Power discs: belongs to nobody). */
 
 export const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 
@@ -10,45 +11,45 @@ export function heights(cells, W, H) {
   return h;
 }
 
-/** Does the disc at (c, r) belong to a line of 4+ for player p? */
-export function winsAt(cells, W, H, c, r, p) {
+/** Does the disc at (c, r) belong to a line of n+ (default 4) for player p? */
+export function winsAt(cells, W, H, c, r, p, n = 4) {
   const at = (cc, rr) => cc >= 0 && cc < W && rr >= 0 && rr < H && cells[cc * H + rr] === p;
   for (const [dc, dr] of DIRS) {
-    let n = 1;
-    for (let k = 1; at(c + dc * k, r + dr * k); k++) n++;
-    for (let k = 1; at(c - dc * k, r - dr * k); k++) n++;
-    if (n >= 4) return true;
+    let run = 1;
+    for (let k = 1; at(c + dc * k, r + dr * k); k++) run++;
+    for (let k = 1; at(c - dc * k, r - dr * k); k++) run++;
+    if (run >= n) return true;
   }
   return false;
 }
 
-/** All cells that are part of some 4-in-a-row for player p (for highlighting). */
-export function lineCells(cells, W, H, p) {
+/** All cells that are part of some n-in-a-row (default 4) for player p (for highlighting). */
+export function lineCells(cells, W, H, p, n = 4) {
   const out = new Set();
   for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) {
     for (const [dc, dr] of DIRS) {
       const run = [];
-      for (let k = 0; k < 4; k++) {
+      for (let k = 0; k < n; k++) {
         const cc = c + dc * k, rr = r + dr * k;
         if (cc < 0 || cc >= W || rr < 0 || rr >= H || cells[cc * H + rr] !== p) break;
         run.push(cc * H + rr);
       }
-      if (run.length === 4) run.forEach((i) => out.add(i));
+      if (run.length === n) run.forEach((i) => out.add(i));
     }
   }
   return [...out].sort((a, b) => a - b);
 }
 
-export function hasLine(cells, W, H, p) {
+export function hasLine(cells, W, H, p, n = 4) {
   for (let c = 0; c < W; c++) for (let r = 0; r < H; r++) {
     if (cells[c * H + r] !== p) continue;
     for (const [dc, dr] of DIRS) {
       let k = 1;
-      for (; k < 4; k++) {
+      for (; k < n; k++) {
         const cc = c + dc * k, rr = r + dr * k;
         if (cc < 0 || cc >= W || rr < 0 || rr >= H || cells[cc * H + rr] !== p) break;
       }
-      if (k === 4) return true;
+      if (k === n) return true;
     }
   }
   return false;

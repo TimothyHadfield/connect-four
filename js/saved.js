@@ -6,19 +6,22 @@ import { replay, SIZES } from "./game.js";
 export const LEVEL_KEYS = ["beginner", "easy", "medium", "strong", "perfect"];
 
 export const DEFAULTS = {
-  size: "7x6", popout: false, level: "medium", starts: "you", showSolver: false, anim: true, threats: false,
+  size: "7x6", popout: false, five: false, power: false, speed: "normal", level: "medium", starts: "you", showSolver: false, anim: true, threats: false,
   name: "", nextStart: 0, record: {}, history: [], puzzle: { solved: [] }, current: null, chipsV: 2,
 };
 
 const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
 
+/** Five in a row / Power discs flags of a game state (kept only when on, so older saves look the same). */
+export function variantFlags(s) { return { ...(s.five ? { five: true } : {}), ...(s.power ? { power: true } : {}) }; }
+
 /** Replays a list of moves; returns the final state, or null if a move is illegal. */
 export function replayOk(opts, moves) {
   if (!isObj(opts) || !Array.isArray(moves) || moves.length > 400) return null;
-  if (!SIZES[opts.size]) return null;
+  if (!SIZES[opts.size] && !opts.five) return null;
   if (!moves.every((m) => isObj(m) && (m.s === 0 || m.s === 1))) return null;
-  try { return replay({ size: opts.size, popout: !!opts.popout, first: opts.first === 1 ? 1 : 0 }, moves); } catch (e) { return null; }
+  try { return replay({ size: opts.size, popout: !!opts.popout, five: !!opts.five, power: !!opts.power, first: opts.first === 1 ? 1 : 0 }, moves); } catch (e) { return null; }
 }
 
 /** A finished game kept for Study › Review. */
@@ -31,7 +34,7 @@ export function cleanHistoryEntry(g) {
     date: typeof g.date === "string" ? g.date.slice(0, 10) : "",
     mode: ["computer", "friends", "online"].includes(g.mode) ? g.mode : "friends",
     level: LEVEL_KEYS.includes(g.level) ? g.level : null,
-    opts: { size: s.size, popout: s.popout, first: s.first },
+    opts: { size: s.size, popout: s.popout, first: s.first, ...variantFlags(s) },
     names: Array.isArray(g.names) ? [0, 1].map((i) => String(g.names[i] ?? (i ? "Yellow" : "Red")).slice(0, 40)) : ["Red", "Yellow"],
     you: g.you === 0 || g.you === 1 ? g.you : -1,
     moves: s.moves, winner: s.result.winner, why: s.result.why,
@@ -46,7 +49,7 @@ export function cleanCurrent(c) {
   return {
     mode: c.mode, id: Number.isFinite(c.id) ? c.id : Date.now(),
     level: LEVEL_KEYS.includes(c.level) ? c.level : "medium",
-    options: { size: s.size, popout: s.popout, first: s.first, level: LEVEL_KEYS.includes(c.options.level) ? c.options.level : "medium" },
+    options: { size: s.size, popout: s.popout, first: s.first, ...variantFlags(s), level: LEVEL_KEYS.includes(c.options.level) ? c.options.level : "medium" },
     names: Array.isArray(c.names) ? [0, 1].map((i) => String(c.names[i] ?? "").slice(0, 40)) : null,
     moves: s.moves,
     ...(typeof c.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.daily) ? { daily: c.daily } : {}),
@@ -64,6 +67,9 @@ export function cleanSettings(raw) {
   const out = {
     size: pick("size", (v) => !!SIZES[v]),
     popout: pick("popout", bool),
+    five: pick("five", bool),
+    power: pick("power", bool),
+    speed: pick("speed", (v) => ["slow", "normal", "fast"].includes(v)),
     level: pick("level", (v) => LEVEL_KEYS.includes(v)),
     starts: pick("starts", (v) => ["you", "computer", "alternate"].includes(v)),
     // build 9: chips off by default so games vs the computer count as rated. Settings saved before

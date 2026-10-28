@@ -45,6 +45,15 @@ Checked 2026-10-20. Rule wording here is our own summary, not copied text.
 | 17 | 6×5 draw · 8×7 first-player win · 5×4 draw · 9×7 unsolved | T (results table, checked against the page 2026-10-20) | Lab › Board sizes table copies T exactly |
 | 18 | Solver scores match 290 published solved positions | P (test sets) | tests/solver.test.js |
 
+## Five in a row (wave 3, 2026-10-28)
+
+| # | Rule | Source | Test (tests/variants.test.js) |
+|---|------|--------|------|
+| 19 | 9 × 6 frame: the 7-column board plus a pre-filled column of alternating discs on each side; get **five** in a line; still 42 discs played | W (en.wikipedia.org/wiki/Connect_Four, "Five-in-a-Row") | "9 x 6 board…", "four does not win, five does", "42 discs fill the board" |
+| 19a | Which colour sits at the bottom of each outer column: not stated by W. **Our choice:** left column Red at the bottom, right column Yellow (neither side favoured) | — (house default) | "9 x 6 board…" |
+
+## Power discs (wave 3, house rules after Hasbro's Power Up)
+W lists Power Up's Anvil (pops out every piece below it, lands on the bottom row), Wall (a second non-winning turn), ×2 and Bomb (pop out one opposing piece). Ours keeps Anvil and Bomb as described and uses a **generic "Wall" = a neutral grey disc** (house rule, simpler to read than an extra turn); one of each per player, used instead of a normal disc. Bomb = pop the opponent's bottom disc, judged like a Pop Out pop (both colours four → the bomber wins). Tests: "Anvil…", "Bomb…", "Wall…" in tests/variants.test.js.
+
 ## Not built
-- **Pop 10** (third Hasbro mode: start full, pop your colour, keep it if it was in a four, first to 10 kept). Different goal and setup; parked as an idea (docs/ideas.md).
-- **Power Up / Pop Out "special discs"** editions: product variants with extra pieces, not in the classic rules.
+- **Pop 10** (third Hasbro mode: start full, pop your colour, keep it if it was in a four, first to 10 kept). Different goal and setup phase; skipped in wave 3 in favour of Five and Power (cheaper, and the computers already search them).

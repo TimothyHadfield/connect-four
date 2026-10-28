@@ -1,7 +1,7 @@
 /* Connect Four: page controller (tabs, Play, online rooms, Settings). */
 import "./fx.js";
 import { defineSounds, react, refuse, release, scoreBump, boardAnim } from "./sfx.js";
-import { game, SIZES, setBot, sizeOf } from "./game.js";
+import { game, SIZES, setBot, sizeOf, variantOf, VARIANT_NAMES, POWER_NAMES, actOf } from "./game.js";
 import { createLocal, createOnline } from "./online.js?v=a3d0418b";
 import { Board } from "./board.js";
 import { Analyst, BotClient, chipsFor, bestLine, popChips, colList } from "./analysis.js";
@@ -12,7 +12,7 @@ import { S, save, $, $$, esc, toast, sheet, closeSheet, help, q, discIcon, ordin
 import { HELP } from "./help.js";
 import { initStudy, showStudy, studyGame } from "./study.js";
 import { initTable, showTable } from "./table.js";
-import { renderSettings } from "./settings.js";
+import { renderSettings, SIZE_LIST, RULE_LIST } from "./settings.js";
 import { seatHTML, discsLeft, discsEach, liftOff } from "./seats.js";
 import "./profile.js";
 import { C4_LEVELS, C4_ACHIEVEMENTS, dailyOpening, profileResult, quitResult, seedFromHistory } from "./profile-c4.js";
@@ -87,6 +87,7 @@ root.innerHTML = `
       <button class="btn" id="bHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>Hint</button>
       <button class="btn" id="bUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
       <button class="btn" id="bPop" hidden>Pop</button>
+      <button class="btn" id="bPower" hidden>Power</button>
       <button class="btn" id="bDraw" hidden>Draw</button>
       <button class="btn" id="bLeave" hidden>Leave</button>
       <button class="btn primary" id="bNew">New game</button>
@@ -138,7 +139,7 @@ function abandonDaily() {
   if (!res) return;
   P.counted = P.gameId;
   Profile.recordResult(res);
-  const k = P.level + ":" + P.snap.pub.size + (P.snap.pub.popout ? ":pop" : "");
+  const k = recKey(P.level, P.snap.pub);
   const r = S.record[k] || { w: 0, d: 0, l: 0 };
   r.l++; S.record[k] = r; save();
   toast("Game left: counted as a loss");
@@ -149,12 +150,29 @@ function quitPending() {
   return quitResult({ mode: "computer", level: P.level, pub: P.snap.pub, you: P.human, helped: P.helped, guided: P.guided });
 }
 
-const board = new Board($("#pboard"), { onColumn: (c) => onColumn(c) });
+const board = new Board($("#pboard"), { onColumn: (c) => onColumn(c), ghost: (c) => ghostDisc(c) });
+/** The disc a finger on column c would play (0: none — not your turn, a pop/bomb pick, or a full column). */
+function ghostDisc(c) {
+  const pub = P.snap && P.snap.pub;
+  if (!pub || pub.result || !isMyTurn() || P.popMode || P.pwMode === "b" || P.resuming) return 0;
+  if (pub.cells[c * pub.H + pub.H - 1]) return 0;
+  return P.pwMode === "w" ? 3 : disc(pub.turn);
+}
 board.anim = boardAnim(S.anim);
 
 function curOptions() {
-  return { size: S.size, popout: !!S.popout, level: P.level };
+  const v = variantOf(S);
+  return { size: S.size, popout: v === "popout", ...(v === "five" ? { five: true } : v === "power" ? { power: true } : {}), level: P.level };
 }
+/** Record key "level:size" plus ":pop" / ":five" / ":power" for the rule set (o = options or a public view). */
+function recKey(level, o) {
+  const v = variantOf(o);
+  return level + ":" + (o.five ? "9x6" : o.size) + (v === "popout" ? ":pop" : v ? ":" + v : "");
+}
+/** " · Pop Out" / " · Five in a row" / " · Power discs" (or nothing for the classic rules). */
+function variantLabel(o) { const v = variantOf(o || {}); return v ? " · " + VARIANT_NAMES[v] : ""; }
+/** Five / Power flags to keep with a saved or online game. */
+function vFlags(o) { return { ...(o.five ? { five: true } : {}), ...(o.power ? { power: true } : {}) }; }
 
 export function newLocalGame(mode = P.mode, opts = {}) {
   if (!opts.daily) abandonDaily();
@@ -163,7 +181,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   const resume = opts.resume || null;
   P.mode = mode;
   P.level = opts.level || S.level;
-  P.popMode = false; P.hint = false; P.cols = null; P.pop = null; P.saved = false;
+  P.popMode = false; P.pwMode = ""; P.hint = false; P.cols = null; P.pop = null; P.saved = false;
   P.daily = !!opts.daily && mode === "computer";
   P.dailyDate = P.daily ? opts.dailyDate || today() : "";
   P.helped = !!opts.helped;   // solver chips, a hint or undo were used: counted, not rated
@@ -196,7 +214,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
   if (!resume) { P.room.start(); return; }
   P.silent = true;
   P.room.start();
-  for (const m of resume.moves) P.room.act(m.d ? { draw: true } : m.p ? { c: m.c, p: true } : { c: m.c }, m.s);
+  for (const m of resume.moves) P.room.act(actOf(m), m.s);
   P.silent = false;
   render(P.room.view(P.room.state.turn), { animate: false });
 }
@@ -205,7 +223,7 @@ export function newLocalGame(mode = P.mode, opts = {}) {
 function saveCurrent(pub) {
   if (P.mode === "online") return;
   const cur = pub && !pub.result && pub.moves.length
-    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves, ...(P.daily ? { daily: P.dailyDate } : {}), ...(P.helped ? { helped: true } : {}), ...(P.guided ? { guided: true } : {}) }
+    ? { mode: P.mode, id: P.gameId, level: P.level, options: { size: pub.size, popout: pub.popout, ...vFlags(pub), first: pub.first, level: P.level }, names: P.snap.seats.map((x) => x.name), moves: pub.moves, ...(P.daily ? { daily: P.dailyDate } : {}), ...(P.helped ? { helped: true } : {}), ...(P.guided ? { guided: true } : {}) }
     : null;
   if (JSON.stringify(cur) === JSON.stringify(S.current)) return;
   S.current = cur;
@@ -223,10 +241,10 @@ function replayTo(moves) {
   P.room.on("error", (e) => toast(e.message || String(e)));
   P.silent = true;
   P.room.start();
-  for (const m of moves) P.room.act(m.d ? { draw: true } : m.p ? { c: m.c, p: true } : { c: m.c }, m.s);
+  for (const m of moves) P.room.act(actOf(m), m.s);
   P.silent = false;
   P.saved = false;
-  P.popMode = false;
+  P.popMode = false; P.pwMode = "";
   P.fxPrev = null;
   render(P.room.view(P.room.state.turn), { animate: false });
 }
@@ -269,14 +287,19 @@ function onColumn(c) {
   const seat = s.pub.turn;
   const { W, H, cells } = s.pub;
   let a;
-  if (P.popMode) {
+  if (P.pwMode) {
+    const k = P.pwMode;
+    if (k === "b" && cells[c * H] !== 3 - disc(seat)) { refuse($("#pboard")); toast("The Bomb takes one of the other player's bottom discs."); return; }
+    if (k !== "b" && cells[c * H + H - 1]) { refuse($("#pboard")); toast("That column is full."); return; }
+    a = { c, w: k };
+  } else if (P.popMode) {
     if (cells[c * H] !== disc(seat)) { refuse($("#pboard")); toast("Pop only your own bottom disc."); return; }
     a = { c, p: true };
   } else {
     if (cells[c * H + H - 1]) { refuse($("#pboard")); toast("That column is full."); return; }
     a = { c };
   }
-  P.popMode = false;
+  P.popMode = false; P.pwMode = "";
   act(a, seat);
 }
 
@@ -301,7 +324,7 @@ function render(snap, { animate = true } = {}) {
   board.line(pub.result ? pub.result.line : null);
   const last = lastCell(pub);
   board.last(pub.result ? -1 : last);
-  board.popMarks(P.popMode ? popCols(pub) : null);
+  board.popMarks(P.popMode ? popCols(pub) : P.pwMode === "b" ? popCols(pub, true) : null);
   renderPlayers(snap);
   renderStatus(snap);
   renderActions(snap);
@@ -327,7 +350,7 @@ function render(snap, { animate = true } = {}) {
   const m = pub.moves[pub.moves.length - 1];
   if (animate && S.anim && fxPrev && m && !m.p && !m.d && pub.moves.length === fxPrev.moves.length + 1) {
     const near = nearSeat(snap);
-    liftOff($$("#pl .pl")[m.s], disc(m.s), discsLeft(pub.cells, disc(m.s), pub.W, pub.H), discsEach(pub.W, pub.H), "c4:" + m.s, m.s === near ? "up" : "down");
+    if (!m.w || m.w === "a") liftOff($$("#pl .pl")[m.s], disc(m.s), leftOf(pub, disc(m.s)), totalOf(pub), "c4:" + m.s, m.s === near ? "up" : "down");
   }
 }
 
@@ -340,13 +363,13 @@ function nearSeat(snap) {
 
 function lastCell(pub) {
   const m = pub.moves[pub.moves.length - 1];
-  if (!m || m.p || m.d) return -1;
+  if (!m || m.p || m.d || m.w === "b") return -1;
   const { H, cells } = pub;
   for (let r = H - 1; r >= 0; r--) if (cells[m.c * H + r]) return m.c * H + r;
   return -1;
 }
-function popCols(pub) {
-  const me = disc(pub.turn), out = [];
+function popCols(pub, them = false) {
+  const me = them ? 3 - disc(pub.turn) : disc(pub.turn), out = [];
   for (let c = 0; c < pub.W; c++) if (pub.cells[c * pub.H] === me) out.push(c);
   return out;
 }
@@ -363,10 +386,15 @@ function renderPlayers(snap) {
     if (sub === (seat.name || COLOR[i])) sub = ""; // two players are named Red / Yellow: say the colour once
     const turn = !pub.result && pub.turn === i;
     const near = i === nearSeat(snap);
-    return seatHTML({ v: disc(i), left: discsLeft(pub.cells, disc(i), pub.W, pub.H), total: discsEach(pub.W, pub.H), name: seat.name || COLOR[i], sub,
+    return seatHTML({ v: disc(i), left: leftOf(pub, disc(i)), total: totalOf(pub), name: seat.name || COLOR[i], sub,
       score: rec ? (i === P.human ? rec.w : rec.l) : null, turn, near, h: wide ? (near ? 60 : 44) : near ? 46 : 32, seed: "c4:" + i });
   }).join("");
 }
+
+/** Discs a player holds: Five in a row's 12 starting discs in the outer columns aren't anyone's supply. */
+function totalOf(pub) { return pub.five ? 21 : discsEach(pub.W, pub.H); }
+function leftOf(pub, v) { return pub.five ? Math.max(0, 27 - countOf(pub.cells, v)) : discsLeft(pub.cells, v, pub.W, pub.H); }
+function countOf(cells, v) { let n = 0; for (const x of cells) if (x === v) n++; return n; }
 
 /** " · Elo 1238" on your plate once you have a rated game (local Elo vs the computer levels, My stats). */
 function myElo() {
@@ -376,8 +404,7 @@ function myElo() {
 function matchScore() {
   if (P.mode !== "computer") return null;
   const o = P.options || curOptions();
-  const k = P.level + ":" + o.size + (o.popout ? ":pop" : "");
-  return S.record[k] || { w: 0, d: 0, l: 0 };
+  return S.record[recKey(P.level, o)] || { w: 0, d: 0, l: 0 };
 }
 
 function renderStatus(snap) {
@@ -394,10 +421,11 @@ function renderStatus(snap) {
     return;
   }
   const t = pub.turn;
+  const pickMsg = P.popMode ? ": pick a disc to pop" : P.pwMode === "b" ? ": pick a disc to bomb" : P.pwMode ? `: pick a column for the ${POWER_NAMES[P.pwMode]}` : "";
   if (P.resuming) el.innerHTML = `<span class="thinking">Reconnecting to your room</span>`;
-  else if (P.mode === "computer") el.innerHTML = (t === P.human ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `<span class="thinking">Computer is thinking</span>`) + (P.daily ? " · Daily" : "");
-  else if (P.mode === "online") el.innerHTML = snap.myTurn ? `${discIcon(disc(t))} Your turn${P.popMode ? ": pick a disc to pop" : ""}` : `${discIcon(disc(t))} <span class="thinking">${esc(snap.seats[t].name)} is playing</span>${snap.hostAway ? " · host offline" : ""}`;
-  else el.innerHTML = `${discIcon(disc(t))} ${esc(snap.seats[t].name)}'s turn${P.popMode ? ": pick a disc to pop" : ""}`;
+  else if (P.mode === "computer") el.innerHTML = (t === P.human ? `${discIcon(disc(t))} Your turn${pickMsg}` : `<span class="thinking">Computer is thinking</span>`) + (P.daily ? " · Daily" : "");
+  else if (P.mode === "online") el.innerHTML = snap.myTurn ? `${discIcon(disc(t))} Your turn${pickMsg}` : `${discIcon(disc(t))} <span class="thinking">${esc(snap.seats[t].name)} is playing</span>${snap.hostAway ? " · host offline" : ""}`;
+  else el.innerHTML = `${discIcon(disc(t))} ${esc(snap.seats[t].name)}'s turn${pickMsg}`;
 }
 
 function renderActions(snap) {
@@ -411,6 +439,11 @@ function renderActions(snap) {
   $("#bPop").hidden = !pub.popout;
   $("#bPop").disabled = !canPop;
   $("#bPop").classList.toggle("on", P.popMode);
+  const pw = pub.power && pub.pw ? pub.pw[pub.turn] : null;
+  $("#bPower").hidden = !pub.power;
+  $("#bPower").disabled = !pw || !!pub.result || !isMyTurn() || !(pw.a || pw.b || pw.w);
+  $("#bPower").classList.toggle("on", !!P.pwMode);
+  $("#bPower").textContent = P.pwMode ? POWER_NAMES[P.pwMode] : "Power";
   const full = pub.cells.every((v) => v);
   $("#bDraw").hidden = !(pub.popout && full && !pub.result);
   $("#bNew").hidden = online && !pub.result;
@@ -427,17 +460,22 @@ $("#bHint").onclick = () => {
 function showHint(quiet = false) {
   const pub = P.snap.pub;
   const say = (t) => { if (!quiet) toast(t); };
+  // the hint shows just the best column (all the chips stay a setting: Show the solver)
+  const only = (chips, keep) => (S.showSolver ? chips : chips.map((ch, c) => (keep.includes(c) ? ch : null)));
   if (P.pop) {
     const { chips, best } = popChips(P.pop, pub.W);
-    if (best && best.p) { say(`Best: pop column ${best.c + 1}`); board.popMarks([best.c]); }
-    else if (best) { chips[best.c] = { ...chips[best.c], cls: (chips[best.c].cls || "") + " pick" }; board.setChips(chips); say(`Best: column ${best.c + 1}`); }
+    if (best && (best.p || best.w === "b")) { say(`Best: ${best.p ? "pop" : "Bomb"} column ${best.c + 1}`); board.popMarks([best.c]); }
+    else if (best && best.w) { say(`Best: ${POWER_NAMES[best.w]} in column ${best.c + 1}`); board.setChips(only(chips, [])); board.popMarks([best.c]); }
+    else if (best) { chips[best.c] = { ...chips[best.c], cls: (chips[best.c].cls || "") + " pick" }; board.setChips(only(chips, [best.c])); say(`Best: column ${best.c + 1}`); }
+    if (best) $("#pverdict").innerHTML = verdictPop(best);
     return;
   }
   const b = bestLine(P.cols, count(pub.cells), pub.W, pub.H);
   if (!b) return;
   const chips = chipsFor(P.cols, count(pub.cells), pub.W, pub.H);
   for (const c of b.cols) if (chips[c]) chips[c].cls += " pick";
-  board.setChips(chips);
+  board.setChips(only(chips, b.cols));
+  $("#pverdict").innerHTML = verdictText(b);
   say(`Best: ${colList(b.cols)}${b.d ? (b.d.result === "win" ? `, win in ${b.d.turns}` : b.d.result === "loss" ? `, still lose in ${b.d.turns}` : ", draw") : ""}`);
 }
 $("#bUndo").onclick = () => {
@@ -452,6 +490,20 @@ $("#bUndo").onclick = () => {
   replayTo(moves);
 };
 $("#bPop").onclick = () => { P.popMode = !P.popMode; render(P.snap, { animate: false }); };
+// Power discs: pick one (or tap again to put it back), then tap a column
+$("#bPower").onclick = () => {
+  if (P.pwMode) { P.pwMode = ""; render(P.snap, { animate: false }); return; }
+  const pub = P.snap.pub, pw = pub.pw[pub.turn];
+  const opp = popCols(pub, true).length > 0;
+  const rows = [["a", "Clears the column, lands on the bottom"], ["b", "Pops out a bottom disc of theirs"], ["w", "Grey disc: counts for nobody"]];
+  sheet("", (el) => {
+    el.innerHTML = `<h3>Power disc ${q("power")}</h3><div style="display:flex;flex-direction:column;gap:6px">${rows.map(([k, t]) =>
+      `<button class="btn" data-k="${k}" style="justify-content:space-between" ${pw[k] && (k !== "b" || opp) ? "" : "disabled"}><b>${POWER_NAMES[k]}</b><span class="muted" style="font-size:13px">${pw[k] ? t : "used"}</span></button>`).join("")}</div>
+      <div class="row end"><button class="btn" data-x>Cancel</button></div>`;
+    el.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { closeSheet(); P.pwMode = b.dataset.k; render(P.snap, { animate: false }); }));
+    el.querySelector("[data-x]").onclick = closeSheet;
+  });
+};
 $("#bDraw").onclick = () => act({ draw: true }, P.snap.pub.turn);
 $("#bNew").onclick = () => (P.mode === "online" ? leaveOnline(true) : newGameSheet());
 $("#bLeave").onclick = () => leaveOnline(false);
@@ -467,7 +519,9 @@ function maybeBot(snap, animMs) {
   P.botGen = gen;
   const t0 = performance.now();
   bot.move(pub, P.comp, P.level).then((m) => {
-    const wait = Math.max(0, Math.max(animMs + 150, 450) - (performance.now() - t0));
+    // Settings › Computer speed: the shortest time before its disc drops
+    const min = { slow: 1100, normal: 450, fast: 120 }[S.speed] ?? 450;
+    const wait = Math.max(0, Math.max(animMs + (S.speed === "fast" ? 40 : 150), min) - (performance.now() - t0));
     setTimeout(() => {
       if (P.botGen === gen) P.botGen = -1;
       if (gen !== P.gen || !P.room) return;
@@ -486,13 +540,13 @@ function refreshAnalysis(force = false) {
   if (!S.showSolver && !force && !P.hint && !P.guided) return;
   const pub = s.pub;
   const gen = P.gen, moves = pub.moves.length;
-  analyst.analyze({ cells: pub.cells, W: pub.W, H: pub.H, toMove: disc(pub.turn), firstDisc: disc(pub.first), popout: pub.popout, depth: 5,
+  analyst.analyze({ cells: pub.cells, W: pub.W, H: pub.H, toMove: disc(pub.turn), firstDisc: disc(pub.first), popout: pub.popout, five: !!pub.five, power: !!pub.power, pw: pub.pw, depth: 5,
     weakBudget: 4e7, strongBudget: 8e6 }, (m) => {
     if (gen !== P.gen || !P.snap || P.snap.pub.moves.length !== moves) return;
     if (m.error) return;
     if (m.pop) { P.pop = m.pop; }
     else P.cols = m.cols;
-    if (S.showSolver || P.hint || P.guided) drawChips();
+    if (S.showSolver || P.guided) drawChips(); // a Hint alone shows just its column (showHint)
     // a hint needs only win / draw / lose for every column, not the exact distances
     const ready = m.done || (!m.pop && m.cols && m.cols.every((x) => !x || (x.cat !== null && x.cat !== undefined)));
     if (P.hint && ready) { showHint(P.hintShown === moves); P.hintShown = moves; }
@@ -519,7 +573,7 @@ function verdictText(b) {
   return `Best: <b>${cols}</b> · lost with best play${b.d ? `, holds out ${b.d.turns} turns` : ""} ${q("chips")}`;
 }
 function verdictPop(best) {
-  return `Best: <b>${best.p ? "pop" : "drop in"} column ${best.c + 1}</b> ${q("popchips")}`;
+  return `Best: <b>${best.p ? "pop" : best.w ? POWER_NAMES[best.w] + " in" : "drop in"} column ${best.c + 1}</b> ${q("popchips")}`;
 }
 
 /* ------------------------------------------------------------- finish */
@@ -532,7 +586,7 @@ function onFinished(snap) {
   const firstTime = P.counted !== P.gameId;
   P.counted = P.gameId;
   if (P.mode === "computer" && firstTime && !P.guided) {
-    const k = P.level + ":" + pub.size + (pub.popout ? ":pop" : "");
+    const k = recKey(P.level, pub);
     const r = S.record[k] || { w: 0, d: 0, l: 0 };
     if (w < 0) r.d++; else if (w === P.human) r.w++; else r.l++;
     S.record[k] = r;
@@ -563,7 +617,7 @@ function onFinished(snap) {
     S.history = S.history.filter((g) => g.id !== id);
     S.history.unshift({
       id, date: today(), mode: P.mode, level: P.mode === "computer" ? P.level : null,
-      opts: { size: pub.size, popout: pub.popout, first: pub.first }, names: snap.seats.map((s) => s.name),
+      opts: { size: pub.size, popout: pub.popout, first: pub.first, ...vFlags(pub) }, names: snap.seats.map((s) => s.name),
       you: P.mode === "computer" ? P.human : P.mode === "online" ? snap.mySeat : -1,
       moves: pub.moves, winner: w, why: pub.result.why,
     });
@@ -571,8 +625,11 @@ function onFinished(snap) {
     save();
   }
   const eloTxt = elo ? ` <span class="elo-ch" style="color:var(--${elo.change >= 0 ? "good" : "bad"})">Elo ${elo.change >= 0 ? "+" : "−"}${Math.abs(elo.change)}</span>` : "";
-  $("#pverdict").innerHTML = `<button class="btn small" id="bReview">Review this game</button>${eloTxt}`;
+  // one tap to play the same setup again (vs the computer or a friend; online has its own New room)
+  const again = P.mode !== "online" && !P.guided && !P.daily;
+  $("#pverdict").innerHTML = `${again ? `<button class="btn small primary" id="bAgain">Play again</button> ` : ""}<button class="btn small" id="bReview">Review this game</button>${eloTxt}`;
   $("#bReview").onclick = () => { studyGame(S.history[0]); goTab("study"); };
+  if (again) $("#bAgain").onclick = () => newLocalGame(P.mode, { level: P.level });
 }
 
 /** true if this finished online game (room code + moves) was already counted on this device. */
@@ -591,10 +648,10 @@ function renderSide() {
   const pub = P.snap && P.snap.pub;
   if (!pub) { el.innerHTML = ""; return; }
   const rec = matchScore();
-  const list = pub.moves.map((m, i) => `<span class="mv">${discIcon(disc(m.s), 12)}${i + 1}. ${m.d ? "draw" : (m.p ? "pop " : "") + (m.c + 1)}</span>`).join("");
+  const list = pub.moves.map((m, i) => `<span class="mv">${discIcon(disc(m.s), 12)}${i + 1}. ${m.d ? "draw" : (m.p ? "pop " : m.w ? POWER_NAMES[m.w].toLowerCase() + " " : "") + (m.c + 1)}</span>`).join("");
   el.innerHTML = `
     <div class="panel"><h2>Game</h2>
-      <div class="muted" style="font-size:13.5px">${esc(pub.size.replace("x", " × "))}${pub.popout ? " · Pop Out" : ""} · ${P.mode === "computer" ? (P.daily ? "Daily game · " : "") + "vs computer (" + LEVEL_NAMES[P.level] + ")" : P.mode === "friends" ? "2 players, one device" : "online"}</div>
+      <div class="muted" style="font-size:13.5px">${esc(pub.size.replace("x", " × "))}${variantLabel(pub)} · ${P.mode === "computer" ? (P.daily ? "Daily game · " : "") + "vs computer (" + LEVEL_NAMES[P.level] + ")" : P.mode === "friends" ? "2 players, one device" : "online"}</div>
       ${rec ? `<div style="margin-top:6px;font-size:14px">Record: <b>${rec.w}</b> won · <b>${rec.d}</b> drawn · <b>${rec.l}</b> lost</div>` : ""}
     </div>
     <div class="panel"><h2>How to read the chips ${q("chips")}</h2>
@@ -610,7 +667,7 @@ function dailyWord() {
   return r ? { w: "Won", l: "Lost", d: "Drawn", p: "Played" }[r.r] + " · next one tomorrow" : "Not played";
 }
 export function newGameSheet() {
-  let mode = P.mode === "online" ? "computer" : P.mode, level = S.level, starts = S.starts;
+  let mode = P.mode === "online" ? "computer" : P.mode, level = S.level, starts = S.starts, size = S.size, rule = variantOf(S);
   const draw = (el) => {
     el.innerHTML = `
       <h3>New game</h3>
@@ -626,15 +683,21 @@ export function newGameSheet() {
       ${mode === "daily" ? `<p>Today's opening against Strong, the same for everyone. No hints or undo.</p>
       <div class="muted" style="font-size:13.5px">Today: <b style="color:var(--text)">${dailyWord()}</b> · streak <b style="color:var(--text)">${Profile.daily.streak().cur}</b></div>
       ${!dailyOn() && !Profile.daily.played() && quitPending() ? `<div style="font-size:13.5px;color:var(--warm)">The game on the table will count as a loss.</div>` : ""}`
-      : `<div class="muted" style="font-size:13.5px">Board: <b style="color:var(--text)">${S.size.replace("x", " × ")}${S.popout ? " · Pop Out" : ""}</b> · change it in Settings</div>
+      : `<div class="field"><span class="label">Board</span>
+        <div class="seg" id="ngSize">${SIZE_LIST.map(([k, t]) => `<button data-k="${k}" class="${rule !== "five" && size === k ? "on" : ""}" ${rule === "five" ? "disabled" : ""}>${t}</button>`).join("")}</div></div>
+      <div class="field"><span class="label">Rules ${q("variants")}</span>
+        <div class="seg" id="ngRule">${RULE_LIST.map(([k, t]) => `<button data-k="${k}" class="${rule === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
       ${dailyOn() ? `<div style="font-size:13.5px;color:var(--warm)">Your Daily game will count as a loss.</div>` : quitPending() ? `<div style="font-size:13.5px;color:var(--warm)">The game on the table will count as a loss.</div>` : ""}`}
       <div class="row end"><button class="btn" data-x>Cancel</button><button class="btn primary" data-go ${mode === "daily" && Profile.daily.played() && !dailyOn() ? "disabled" : ""}>${mode === "online" ? "Continue" : mode === "daily" && dailyOn() ? "Back to it" : "Start"}</button></div>`;
     el.querySelectorAll("#ngMode button").forEach((b) => (b.onclick = () => { mode = b.dataset.k; draw(el); }));
     el.querySelectorAll("#ngLevel button").forEach((b) => (b.onclick = () => { level = b.dataset.k; draw(el); }));
     el.querySelectorAll("#ngStart button").forEach((b) => (b.onclick = () => { starts = b.dataset.k; draw(el); }));
+    el.querySelectorAll("#ngSize button").forEach((b) => (b.onclick = () => { size = b.dataset.k; draw(el); }));
+    el.querySelectorAll("#ngRule button").forEach((b) => (b.onclick = () => { rule = b.dataset.k; draw(el); }));
     el.querySelector("[data-x]").onclick = closeSheet;
     el.querySelector("[data-go]").onclick = () => {
       closeSheet();
+      if (mode !== "daily") { S.size = size; S.popout = rule === "popout"; S.five = rule === "five"; S.power = rule === "power"; save(); }
       if (mode === "online") { openOnline(); return; }
       if (mode === "daily") { startDaily(); return; }
       S.level = level; S.starts = starts; save();
@@ -685,7 +748,7 @@ function renderOnline(snap) {
       <div class="code" id="code">${esc(snap.code)}</div>
       <div id="seats">${snap.seats.map((x, i) => `<div class="seat"><span>${discIcon(disc(i))} <span class="on-dot ${x.online ? "on" : ""}"></span>${esc(x.kind === "empty" ? "Open seat" : x.name)}${i === snap.mySeat ? " (you)" : ""}${x.isHost ? " · host" : ""}</span>
         ${host && i !== snap.mySeat ? `<button class="btn small" data-seat="${i}" data-kind="${x.kind === "computer" ? "empty" : "computer"}">${x.kind === "computer" ? "Open seat" : "Computer"}</button>` : `<span class="muted">${x.kind === "computer" ? "computer" : ""}</span>`}</div>`).join("")}</div>
-      <div class="muted" style="font-size:13.5px">${esc((snap.options.size || "7x6").replace("x", " × "))}${snap.options.popout ? " · Pop Out" : ""} · ${snap.options.first === 1 ? "Yellow" : "Red"} starts</div>
+      <div class="muted" style="font-size:13.5px">${esc(snap.options.five ? "9 × 6" : (snap.options.size || "7x6").replace("x", " × "))}${variantLabel(snap.options)} · ${snap.options.first === 1 ? "Yellow" : "Red"} starts</div>
       <div class="row">${host ? `<button class="btn primary grow" id="oStart">Start</button>` : `<span class="muted grow">Waiting for the host to start…</span>`}<button class="btn" id="oLeave">Leave</button></div></div>`;
     box.querySelectorAll("[data-seat]").forEach((b) => (b.onclick = () => online.setSeat(+b.dataset.seat, b.dataset.kind)));
     if (host) $("#oStart").onclick = async () => {
@@ -706,9 +769,10 @@ function renderOnline(snap) {
   const name = () => { const n = $("#oName").value.trim() || "Player"; S.name = n; save(); return n; };
   $("#oCreate").onclick = async () => {
     $("#oMsg").textContent = "Making a room…";
-    const [W, H] = sizeOf({ size: S.size });
+    const o = curOptions();
+    const [W, H] = sizeOf(o);
     loadMainThreadSolver(W, H);
-    const r = await online.createRoom({ name: name(), seats: ["human", "empty"], options: { size: S.size, popout: !!S.popout, first: 0, level: S.level } });
+    const r = await online.createRoom({ name: name(), seats: ["human", "empty"], options: { size: o.size, popout: o.popout, ...vFlags(o), first: 0, level: S.level } });
     if (!r.ok) $("#oMsg").textContent = r.message;
   };
   // codes are 5 letters/digits: drop spaces and dashes people paste, then limit the length

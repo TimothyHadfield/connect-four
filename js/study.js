@@ -4,7 +4,7 @@
 import { S, save, $, $$, esc, toast, q, sheet, closeSheet, discIcon } from "./ui.js";
 import { Board } from "./board.js";
 import { Analyst, BotClient, chipsFor, bestLine, popChips, PWIN, colList } from "./analysis.js";
-import { replay, legalMoves, sizeOf } from "./game.js";
+import { replay, legalMoves, sizeOf, variantOf, VARIANT_NAMES, POWER_NAMES } from "./game.js";
 import { LEVEL_NAMES } from "./ai.js";
 import { winsAt, hasLine } from "./rules.js";
 import { strengthTable } from "./strength.js";
@@ -80,7 +80,7 @@ function pickGame() {
 function gameLabel(g) {
   const opp = g.mode === "computer" ? "vs " + (LEVEL_NAMES[g.level] || "computer") : g.mode === "online" ? "online" : "2 players";
   const res = g.winner < 0 ? "draw" : g.you >= 0 ? (g.winner === g.you ? "won" : "lost") : (g.winner === 0 ? "Red won" : "Yellow won");
-  return `<span>${esc(g.date)} · ${opp}${g.opts.popout ? " · Pop Out" : ""}</span><span class="muted">${res} · ${g.moves.length} moves</span>`;
+  return `<span>${esc(g.date)} · ${opp}${variantOf(g.opts) ? " · " + VARIANT_NAMES[variantOf(g.opts)] : ""}</span><span class="muted">${res} · ${g.moves.length} moves</span>`;
 }
 
 function posAt(ply) { return replay(R.game.opts, R.game.moves, ply); }
@@ -94,7 +94,7 @@ async function runAnalysis() {
     const m = g.moves[i];
     if (m.d) { R.tags[i] = { tag: "best" }; continue; }
     const s = posAt(i);
-    const res = await analyst.once({ cells: s.cells, W: s.W, H: s.H, toMove: s.turn === 0 ? 1 : 2, firstDisc: s.first === 0 ? 1 : 2, popout: s.popout, depth: 5, weakBudget: 1e7, strongBudget: 1.5e6 });
+    const res = await analyst.once({ cells: s.cells, W: s.W, H: s.H, toMove: s.turn === 0 ? 1 : 2, firstDisc: s.first === 0 ? 1 : 2, popout: s.popout, five: !!s.five, power: !!s.power, pw: s.pw, depth: 5, weakBudget: 1e7, strongBudget: 1.5e6 });
     if (gen !== R.gen) return;
     R.cols[i] = res.pop ? { popv: res.pop } : res.cols;
     R.tags[i] = tagMove(R.cols[i], m, s);
@@ -110,7 +110,7 @@ function tagMove(cols, m, s) {
   if (!cols) return null;
   if (cols.popv) {
     const best = Math.max(...cols.popv.map((x) => x.v));
-    const mine = cols.popv.find((x) => x.c === m.c && !!x.p === !!m.p);
+    const mine = cols.popv.find((x) => x.c === m.c && !!x.p === !!m.p && (x.w || "") === (m.w || ""));
     if (!mine) return null;
     if (mine.v === best) return { tag: "best" };
     if (best >= PWIN - 200 && mine.v < PWIN - 200) return { tag: mine.v <= -(PWIN - 200) ? "blunder" : "mistake" };
@@ -155,7 +155,7 @@ function drawReview(animate = false) {
   board.dots(R.threats ? threatDots(s) : null);
   // chips for the position before move R.ply, with the played column marked
   if (cols && !s.result) {
-    if (cols.popv) { const { chips } = popChips(cols.popv, s.W); if (m && !m.p && chips[m.c]) chips[m.c].cls += " pick"; board.setChips(chips); }
+    if (cols.popv) { const { chips } = popChips(cols.popv, s.W); if (m && !m.p && !m.w && chips[m.c]) chips[m.c].cls += " pick"; board.setChips(chips); }
     else { const chips = chipsFor(cols, n, s.W, s.H); if (m && !m.d && chips[m.c]) chips[m.c].cls += " pick"; board.setChips(chips); }
   } else board.setChips(null);
   // verdict line
@@ -164,7 +164,7 @@ function drawReview(animate = false) {
   else if (m) {
     const t = R.tags[R.ply];
     const who = esc(g.names[m.s]);
-    const what = m.d ? "called a draw" : m.p ? `popped column ${m.c + 1}` : `played column ${m.c + 1}`;
+    const what = m.d ? "called a draw" : m.p ? `popped column ${m.c + 1}` : m.w ? `played the ${POWER_NAMES[m.w]} in column ${m.c + 1}` : `played column ${m.c + 1}`;
     let extra = "";
     if (cols && !cols.popv) { const b = bestLine(cols, n, s.W, s.H); if (b && t && t.tag !== "best") extra = ` · best was ${colList(b.cols)}`; }
     vd.innerHTML = `${discIcon(m.s === 0 ? 1 : 2)} ${who} ${what}${t ? ` · <span class="tag ${t.tag}">${TAGS[t.tag]}</span>${t.pts ? ` (−${t.pts})` : ""}` : ` <span class="muted thinking">checking</span>`}${extra}`;
@@ -179,7 +179,7 @@ function drawReview(animate = false) {
   $("#stSummary").innerHTML = sum.join("") + q("points") + (R.running ? ` <span class="muted thinking">checking moves</span>` : "");
   $("#stMoves").innerHTML = g.moves.map((mv, i) => {
     const t = R.tags[i];
-    return `<span class="mv ${i === R.ply ? "cur" : ""}" data-i="${i}">${discIcon(mv.s === 0 ? 1 : 2, 12)}${i + 1}. ${mv.d ? "draw" : (mv.p ? "pop " : "") + (mv.c + 1)}${t ? ` <span class="tag ${t.tag}">${TAGS[t.tag]}</span>` : ""}</span>`;
+    return `<span class="mv ${i === R.ply ? "cur" : ""}" data-i="${i}">${discIcon(mv.s === 0 ? 1 : 2, 12)}${i + 1}. ${mv.d ? "draw" : (mv.p ? "pop " : mv.w ? POWER_NAMES[mv.w].toLowerCase() + " " : "") + (mv.c + 1)}${t ? ` <span class="tag ${t.tag}">${TAGS[t.tag]}</span>` : ""}</span>`;
   }).join("");
   $$("#stMoves .mv").forEach((e) => (e.onclick = () => go(+e.dataset.i)));
   const cur = $("#stMoves .mv.cur");
@@ -196,7 +196,7 @@ export function threatDots(s) {
     if (cells[i]) continue;
     for (const v of [1, 2]) {
       cells[i] = v;
-      const w = winsAt(cells, W, H, c, r, v);
+      const w = winsAt(cells, W, H, c, r, v, s.n || 4);
       cells[i] = 0;
       if (w) out.push({ i, v, odd: ((r + 1) % 2 === 1) === (v === firstDisc) });
     }
