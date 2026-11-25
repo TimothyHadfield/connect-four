@@ -772,7 +772,7 @@ function renderOnline(snap) {
     const o = curOptions();
     const [W, H] = sizeOf(o);
     loadMainThreadSolver(W, H);
-    const r = await online.createRoom({ name: name(), seats: ["human", "empty"], options: { size: o.size, popout: o.popout, ...vFlags(o), first: 0, level: S.level } });
+    const r = await online.createRoom({ name: name(), seats: ["human", "empty"], options: { size: o.size, popout: o.popout, ...vFlags(o), first: Math.random() < 0.5 ? 0 : 1, level: S.level } }); // random starter, like a real table (Tim 2026-11-25)
     if (!r.ok) $("#oMsg").textContent = r.message;
   };
   // codes are 5 letters/digits: drop spaces and dashes people paste, then limit the length

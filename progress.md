@@ -98,6 +98,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - ~~Solver chips shown by default on Play~~ → off by default since build 10 so games count as rated (Tim's call to change); the guided first game shows them.
 - Leaving a game vs the computer after your first disc counts as a loss (build 10, same rule as Stratego/Risk); before your first disc it's free.
 - Strength measured from random 2-disc openings played twice with colours swapped.
+- 2026-11-25 (Catan-lessons pass, build 15): online rooms now pick the starting colour at random (was always Red/host). Audited and already fine: the win stays on the board (winning four ringed, no end screen covering it), no page scroll at 393×659 / 1280×720, computer pace (Speed setting), vs-computer "Who starts" stays the player's choice.
 - Table look (build 5, Tim's call to change): dark wood table; discs kept in stacks of 7; friends mode puts Red at the near edge; buttons and tab bar stay app-style, off the table; win rings/dimming and last-move dot kept.
 - My stats (build 8, Tim's call to change): button placement, achievement names, "with help" games unrated, Daily = 4-disc opening vs Strong with no help and leaving = loss.
 - Pop 10 not built (docs/rules-check.md "Not built"); wave 3 picked Five + Power instead: cheaper (same drop flow, the generic search handles both) and more fun per hour than Pop 10's setup phase + scoring.
