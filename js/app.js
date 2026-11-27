@@ -853,14 +853,17 @@ hooks.startGuided = () => startGuided();
 
 // Laptop: the board takes the whole table column; the status, verdict and buttons sit at the top
 // of the side column. Phone: they go back on the table / under it. Same elements, just moved.
+// Phone on its side: the buttons go onto the table under the other player's seat (CSS area "act").
+const SIDEWAYS = matchMedia("(max-width: 899px) and (max-height: 500px) and (orientation: landscape)");
 function placeControls(wide) {
   const ctrl = $("#pctrl"), main = $("#ptable").parentElement;
   if (wide) ctrl.append($("#pstatus"), $("#pverdict"), $("#pactions"));
-  else { $("#ptable").append($("#pstatus"), $("#pverdict")); main.append($("#pactions")); }
+  else { $("#ptable").append($("#pstatus"), $("#pverdict")); (SIDEWAYS.matches ? $("#ptable") : main).append($("#pactions")); }
 }
 placeControls(matchMedia("(min-width: 900px)").matches);
 // laptop window dragged across the 900 px layout change: move the controls, redraw the seats at the new size
 try { matchMedia("(min-width: 900px)").addEventListener("change", (e) => { placeControls(e.matches); if (P.snap && P.snap.pub && !$("#pstage").hidden) renderPlayers(P.snap); }); } catch (e) { /* old browser */ }
+try { SIDEWAYS.addEventListener("change", () => placeControls(matchMedia("(min-width: 900px)").matches)); } catch (e) { /* old browser */ }
 
 // home-screen app (shared _pwa kit): a new version reloads itself only at a quiet moment — no room, no
 // sheet or panel open, not typing, the computer not thinking, and the game over / not started (or on Settings,

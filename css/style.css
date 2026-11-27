@@ -113,16 +113,20 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
   background: linear-gradient(#3b2a1a, #24180d); border: 1px solid #7a5a2e; color: #f6efdc;
   box-shadow: inset 0 1px 0 rgba(255,220,150,.22), 0 2px 4px rgba(0,0,0,.4); transition: border-color .2s, box-shadow .2s; }
 .pl .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 13.5px; font-weight: 700; line-height: 1.15; }
-.pl .nm small { display: block; font-size: 11px; color: #cdbb98; font-weight: 550; }
-.pl.far .nm { font-size: 12px; } .pl.far .nm small { font-size: 10px; } .pl.far .sc { font-size: 15px; } .pl.far .plate { padding: 0 8px; gap: 7px; }
+.pl .nm small { display: block; font-size: 12px; color: #cdbb98; font-weight: 550; }
+.pl.far .nm { font-size: 13px; } .pl.far .nm small { font-size: 12px; } .pl.far .sc { font-size: 15px; } .pl.far .plate { padding: 0 8px; gap: 7px; }
 .pl .sc { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 800; }
 .pl.turn .plate { border-color: #f0c35a; box-shadow: 0 0 0 2px rgba(240,195,90,.45), 0 2px 4px rgba(0,0,0,.4); }
 /* phone on its side: the board takes the table's full height in the middle; your seat with the
    status and verdict sits on the left, the other player's seat on the right */
 @media (max-width: 899px) and (max-height: 500px) and (orientation: landscape) {
-  .tabletop { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) minmax(120px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto auto;
-    grid-template-areas: ". board far" "st board far" "vd board far" "near board far"; column-gap: 8px; row-gap: 4px; padding: 6px; }
+  /* the buttons (moved onto the table by app.js placeControls) sit under the other player's seat,
+     so the board gets the height the button row took and the empty wood beside it */
+  .tabletop { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2.4fr) minmax(120px, 1fr); grid-template-rows: minmax(0, 1fr) auto auto auto;
+    grid-template-areas: ". board far" "st board act" "vd board act" "near board act"; column-gap: 8px; row-gap: 4px; padding: 6px; }
   .tabletop .pl.far { grid-area: far; align-self: start; flex-direction: column; }
+  .tabletop .actions { grid-area: act; align-self: end; flex-direction: column; gap: 5px; }
+  .tabletop .actions .btn { flex: none; min-height: 38px; padding: 4px 6px; }
   .tabletop .pl.near { grid-area: near; align-self: end; }
   .tabletop .stage { grid-area: board; min-width: 0; }
   .tabletop #ponline { grid-area: 1 / 1 / -1 / -1; }
@@ -148,7 +152,7 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 @media (max-width: 899.98px) {
   .c4-me { top: 4px; left: 5px; height: auto; min-width: 0; flex-direction: column; gap: 1px; padding: 3px 5px 3px; border-radius: 10px; }
   .c4-me .pf-av { width: 22px; height: 22px; }
-  .c4-me span { display: block; font-size: 9.5px; font-weight: 700; line-height: 1.05; white-space: nowrap; letter-spacing: .01em; }
+  .c4-me span { display: block; font-size: 10.5px; font-weight: 700; line-height: 1.05; white-space: nowrap; letter-spacing: .01em; }
 }
 @media (min-width: 900px) { .c4-me { top: 10px; left: 12px; height: 40px; padding: 0 5px; border-radius: 20px; } .c4-me .pf-av { width: 28px; height: 28px; } .c4-me span { display: inline; padding-right: 7px; } }
 .tabletop .status { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
@@ -194,6 +198,11 @@ input[type=text] { background: var(--bg-soft); border: 1px solid var(--line); co
 .actions { flex: none; display: flex; gap: 6px; }
 .actions .btn { flex: 1; padding: 8px 6px; }
 /* Pop Out with a full board shows five buttons: on narrow phones they share the row (labels may wrap, icons go) */
+/* narrow phones (320 px): thinner margins so each column stays a 36 px tap */
+@media (max-width: 360px) {
+  #tab-play { padding: 5px 5px 4px; }
+  #tab-play .tabletop { padding: 4px 3px 3px; }
+}
 @media (max-width: 420px) {
   .actions .btn { min-width: 0; white-space: normal; line-height: 1.1; text-align: center; }
   .actions:has(#bDraw:not([hidden])) .btn svg { display: none; }
