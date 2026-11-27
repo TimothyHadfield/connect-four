@@ -1,7 +1,7 @@
 # progress — Connect Four
 
 ## START HERE
-Read this, then CLAUDE.md (commands, traps), then docs/rules-check.md and docs/ideas.md. Last updated 2026-10-28 (build 13, wave 3: Five in a row + Power discs variants, Videos in the rules sheet, one-column Hint, Play again, touch ghost disc, Board/Rules rows in New game, computer speed).
+Read this, then CLAUDE.md (commands, traps), then docs/rules-check.md and docs/ideas.md. Last updated 2026-11-27 (build 16 fit pass; earlier: build 13, wave 3: Five in a row + Power discs variants, Videos in the rules sheet, one-column Hint, Play again, touch ghost disc, Board/Rules rows in New game, computer speed).
 
 ## Goal right now
 A Connect Four site in the board-games family: play the computer at measured levels, study games with a perfect solver, check a real table's board, and play friends online. Built as part of Tim's "add risk, clue, battleship, connect four, … to the list of games" wave. Live: https://timothyhadfield.github.io/connect-four/ (repo TimothyHadfield/connect-four).
@@ -9,6 +9,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 ## Status
 | Part | State |
 |---|---|
+| Fit pass 2026-11-27 (build 16) | Done. Phone on its side: Hint/Undo/New game sit on the table under the other player's seat (app.js `placeControls` moves `#pactions` into `#ptable`, CSS area `act`), board column 33.8 → 40.3 px, board 66% → 79% of the height. 320 px: thinner Play margins, column 35.5 → 36.6 px. Seat captions 10–11 → 12 px, far name 13 px, My stats caption 10.5 px. Check: `node tests/fit-ui.mjs [url] [shotDir]` (nearly full board, 5 sizes; 20 failed on build 15). |
 | Wave-3 kit sweep (build 14, 2026-10-28) | Done. game-coach 1.2.0 (offer `place:"auto", avoid:["#bNew"]`) + game-pwa 1.4.0 copied; offer covers neither tab bar nor New game at 393×659/320×568/659×393; Settings no sideways scroll at 320; no `<select>`. |
 | Rules engine (js/game.js, rules.js) | Done. Sizes 7×6, 6×5, 8×7, 9×7, 5×4; Pop Out (own-pop, both-four goes to the popper, repetition draw at 3, full-board pop-or-draw). |
 | Solver | Done. Pons-style negamax in WebAssembly (js/solver.wasm from wasm/solver.ts) for boards with W·(H+1) ≤ 64, JS fallback (js/solver.js), opening book data/book7x6.bin (128,323 positions). |
@@ -99,6 +100,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 - Leaving a game vs the computer after your first disc counts as a loss (build 10, same rule as Stratego/Risk); before your first disc it's free.
 - Strength measured from random 2-disc openings played twice with colours swapped.
 - 2026-11-25 (Catan-lessons pass, build 15): online rooms now pick the starting colour at random (was always Red/host). Audited and already fine: the win stays on the board (winning four ringed, no end screen covering it), no page scroll at 393×659 / 1280×720, computer pace (Speed setting), vs-computer "Who starts" stays the player's choice.
+- Fit pass (build 16, Tim's call to change): on a sideways phone the app-style buttons now sit on the wood under the other player's seat (they used to be a row under the table); upright phone and laptop unchanged.
 - Table look (build 5, Tim's call to change): dark wood table; discs kept in stacks of 7; friends mode puts Red at the near edge; buttons and tab bar stay app-style, off the table; win rings/dimming and last-move dot kept.
 - My stats (build 8, Tim's call to change): button placement, achievement names, "with help" games unrated, Daily = 4-disc opening vs Strong with no help and leaving = loss.
 - Pop 10 not built (docs/rules-check.md "Not built"); wave 3 picked Five + Power instead: cheaper (same drop flow, the generic search handles both) and more fun per hour than Pop 10's setup phase + scoring.
@@ -106,6 +108,7 @@ A Connect Four site in the board-games family: play the computer at measured lev
 
 ## NOT verified
 - Real iPhone (only WebKit at iPhone size).
+- Fit pass (build 16): sideways layout seen only in headless WebKit at 659×393; turning a real phone mid-game (buttons move on the orientation change) not felt. On a fresh profile the first-visit coach offer overlaps the Hint button's left edge by ~5 px at 659×393 (offer is a one-time card; left as is).
 - Build 10: home-screen install and offline play on a real iPhone (pwa-check 18/18 in headless WebKit + Chromium only); guided game felt only via scripted taps at 393×659, 659×393, 1280×800.
 - "Perfect" is truly perfect only when the solver finishes in time: in 1 of 900 measured games it did worse than its start allowed; on 9×7 and Pop Out it looks ahead and can be beaten (said in Help).
 - Pop Out analysis is heuristic, not solved.

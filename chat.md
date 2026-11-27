@@ -61,3 +61,8 @@
 
 ## 2026-10-28 — wave-3 kit sweep (build 14)
 - game-coach 1.2.0 + game-pwa 1.4.0 copied; first-visit offer `place:"auto"` avoiding New game. Verified: npm 69/69, pwa-check 18/18 (WebKit), offer rects clear of tab bar + New game at 393×659/320×568/659×393, Settings 320 no sideways scroll, 393 screenshot looked at.
+
+## 2026-11-27 — fit pass (build 16)
+- **Asked:** Tim (all games): "make sure that they all are good in theat aspect specifically" (spacing, sizing, seeing the full screen). Manager: nearly full board, grid as big as the screen allows, column taps ≥ 36 px, readable status.
+- **Built:** phone on its side puts Hint/Undo/New game on the table under the other seat (app.js `placeControls` + CSS area `act`), board column 2fr → 2.4fr; 320 px Play margins thinner; seat captions 12 px. tests/fit-ui.mjs (new).
+- **Verified:** fit-ui 20 FAIL on build 15 → all pass (659×393 column 33.8 → 40.3 px, board 66 → 79% of the height; 320 column 35.5 → 36.6 px; captions 10 → 12 px); npm 69/69; layout/regress/edge pass, pwa-check 18/18 (local WebKit); 5-button Pop Out row fits beside the board at 659×393; after shots looked at (manager scratchpad `fit-c4/after/`).
